@@ -2,20 +2,19 @@ import sys
 import numpy as np
 import pandas as pd
 import networkx as nx
-import scipy
-import matplotlib
 import matplotlib.pyplot as plt
-import itertools
-import json
+import scipy
+import scipy.io
 from scipy.stats import beta
+import time
+import itertools
 from ast import literal_eval
 
+from joblib import Parallel, delayed
 
 
 
-
-########################### Utilities ###########################
-
+########################### Useful Functions ###########################
 
 def flip_edge(G, i, j):
     if (i,j) in list(G.edges()):
@@ -41,7 +40,7 @@ def get_measure(G, s, measure = 'pol'):
     z_mean = np.dot(np.linalg.inv(np.identity(n) + L), s_mean)
 
     if measure =='pol':
-        return np.dot(np.transpose(z_mean), z_mean)[0,0]     
+        return np.round(np.dot(np.transpose(z_mean), z_mean)[0,0], 4)
 
     elif measure == 'dis':
         return np.dot(np.dot(np.transpose(z_mean), L), z_mean)[0,0]  
@@ -50,54 +49,18 @@ def get_measure(G, s, measure = 'pol'):
         return np.dot(np.dot(np.transpose(s_mean), L), s_mean)[0,0] 
 
     elif measure == 'spectral_gap':
-        lambdas = np.linalg.eigvals(L)
-        return np.sort(lambdas)[1]
+        return np.real(np.sort_complex(np.linalg.eigvals(L))[1])
+
+    elif measure == 'homophily':
+        return np.round(nx.numeric_assortativity_coefficient(G,'innate'),4)
+
     else:
         Exception('Unknown measure requested.')
         return
-    
-
-def plot_graph(G, s, **kwargs):
-    try:
-        edge_color = [item for (key, item) in kwargs.items() if key =='edge_color'][0]
-    except:
-        edge_color = None
-
-    plt.figure(figsize=(10,10))
-    nx.draw(G, node_color = list(s[:,0]), **kwargs)
-    if edge_color is not None:
-        plt.gca().collections[0].set_edgecolor(edge_color)
-    return
 
 
-
-def save_data(outputs, s, name):
-    data = dict()
-
-    data['s'] = s.tolist()
-    data['pol'] = outputs['pol']
-
-    for (key,G) in outputs.items():
-        if key != 'pol':
-            data[key] = nx.adjacency_matrix(G).todense().tolist()
-
-    with open('data/out/'+name+'.json', 'w') as fp:
-        json.dump(data, fp)
-
-    return
-
-
-def load_data(name):
-    with open('data/out/'+name+'.json', 'r') as fp:
-        data = json.load(fp)
-
-    for (key,val) in data.items():
-        if key not in set(['s','pol']):
-            data[key] = nx.from_numpy_matrix(np.array(data[key]))
-
-    return data
-
-
+def SM_inv(A_inv,u,v):
+    return A_inv - (A_inv @ np.outer(u, v) @ A_inv)/(1+v.T @ A_inv @ u)
 
 
 
@@ -136,8 +99,12 @@ def load_twitter():
             A[j-1, i-1] = 1
 
     G = nx.from_numpy_matrix(A)
+    L = nx.laplacian_matrix(G).todense()
 
-    return (n, s, A, G, nx.laplacian_matrix(G).todense())
+    s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
+    nx.set_node_attributes(G, s_dict, "innate")
+
+    return (n, s, A, G, L)
 
 
 
@@ -166,8 +133,54 @@ def load_reddit():
     A = np.delete(A, 52, 0)
 
     G = nx.from_numpy_matrix(A)
+    L = nx.laplacian_matrix(G).todense()
 
-    return(n, s, A, G, nx.laplacian_matrix(G).todense())
+    s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
+    nx.set_node_attributes(G, s_dict, "innate")
+
+    return (n, s, A, G, L)
+
+
+def load_blogs():
+    G_raw =  nx.read_gml('data/in/polblogs.gml')
+
+    # make undirected, remove multiedges
+    G = nx.Graph(G_raw.to_undirected())
+
+    # get largest connected component only
+    G = G.subgraph(max(nx.connected_components(G), key=len))
+
+    # change node labels to integers, keep old ones
+    G = nx.convert_node_labels_to_integers(G, label_attribute = 'name')
+
+    # set node attributes for 'innate'
+    s_dict = nx.get_node_attributes(G, 'value')
+    nx.set_node_attributes(G, s_dict, 'innate')
+
+    n = len(G.nodes())
+    s = np.array([list(s_dict.values())]).T
+    A = nx.adjacency_matrix(G).todense()
+    L = nx.laplacian_matrix(G).todense()
+
+    return (n, s, A, G, L)
+
+
+
+def load_facebook():
+    edge_df = pd.read_csv('data/in/edges_fb.csv')
+
+    G = nx.from_pandas_edgelist(edge_df)
+
+    # get largest connected component only
+    G = G.subgraph(max(nx.connected_components(G), key=len))
+
+    ## This graph still has about 4k nodes -- too much... 
+
+    # change node labels to integers
+    G = nx.convert_node_labels_to_integers(G)
+
+    return
+
 
 
 
@@ -182,7 +195,10 @@ def process_df_cols(df, cols):
                 df_out.at[i,colname] = literal_eval(df.loc[:,colname].iloc[i])
                 
             else:
+#            df_out.loc[:,colname].iloc[i]= literal_eval(','.join(df.loc[:,colname].iloc[i].replace('\n','').split()))
+                #df_out.at[i,colname]= literal_eval(','.join(df.loc[:,colname].iloc[i].replace('\n','').split()))            
                 as_list = df.loc[:,colname].iloc[i].replace('\n','').replace('[','').replace(']','').replace(',','').split()
+                #print(as_list)
                 df_out.at[i,colname] = [float(item) for item in as_list]
 
 
@@ -194,10 +210,10 @@ def process_df_cols(df, cols):
 ########################### Graph Generation ###########################
 
 
-def make_erdos_renyi(n, p, weighted = True):
+def make_erdos_renyi(n, p, weighted = False):
     rand_count = int(0.5*(n**2 - n))
     weights = scipy.sparse.random(1, rand_count, density = p).A[0]    
-    G = np.zeros((n, n))
+    A = np.zeros((n, n))
     idx = 0
     for i in range(n):
         for j in range(n):
@@ -206,20 +222,26 @@ def make_erdos_renyi(n, p, weighted = True):
                 continue
             elif i < j:
                 if weighted:
-                    G[i][j] = weights[idx]
+                    A[i][j] = weights[idx]
                 else:
                     if weights[idx] > 0:
-                        G[i][j] = 1
+                        A[i][j] = 1
                 idx += 1
             else:
                 # adjacency matrix is symmetric 
-                G[i][j] = G[j][i]
+                A[i][j] = A[j][i]
+
+    G = nx.from_numpy_matrix(A)
+
+    s = np.random.uniform(size = (n,1))
+    s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
+    nx.set_node_attributes(G, s_dict, "innate")
                 
-    return nx.from_numpy_matrix(G)
+    return (G, s)
 
 
 
-def make_block(n, p1, p2, weighted = True):
+def make_block(n, p1, p2, a, b, weighted = False):
     # create two communities connected with density d1
     c1 = np.sort(np.random.choice(n, int(n/2), replace=False))
     n1 = len(c1)
@@ -230,7 +252,7 @@ def make_block(n, p1, p2, weighted = True):
     weights1 = scipy.sparse.random(1, int(0.5*n1*(n1 - 1)), density=p1).A[0]
     weights2 = scipy.sparse.random(1, int(0.5*n2*(n2 - 1)), density=p1).A[0] 
     
-    G = np.zeros((n, n))
+    A = np.zeros((n, n))
     idx = 0
     for i in c1:
         for j in c1:
@@ -238,13 +260,13 @@ def make_block(n, p1, p2, weighted = True):
                 continue
             elif i < j:
                 if weighted:
-                    G[i][j] = weights1[idx]
+                    A[i][j] = weights1[idx]
                 else:
                     if weights1[idx] > 0:
-                        G[i][j] = 1
+                        A[i][j] = 1
                 idx += 1
             else:
-                G[i][j] = G[j][i]
+                A[i][j] = A[j][i]
     
     idx = 0
     for i in c2:
@@ -253,13 +275,13 @@ def make_block(n, p1, p2, weighted = True):
                 continue
             elif i < j:
                 if weighted:
-                    G[i][j] = weights2[idx]
+                    A[i][j] = weights2[idx]
                 else:
                     if weights2[idx] > 0:
-                        G[i][j] = 1
+                        A[i][j] = 1
                 idx += 1
             else:
-                G[i][j] = G[j][i]
+                A[i][j] = A[j][i]
 
     
     # weights for connections in between are of density d2
@@ -268,16 +290,22 @@ def make_block(n, p1, p2, weighted = True):
     for i in c1:
         for j in c2:
             if weighted:
-                G[i][j] = weights_between[idx]
+                A[i][j] = weights_between[idx]
             else:
                 if weights_between[idx] > 0:
-                    G[i][j] = 1
+                    A[i][j] = 1
             idx += 1        
     for i in c2:
         for j in c1:
-            G[i][j] = G[j][i]
+            A[i][j] = A[j][i]
                 
-    return (c1, c2, nx.from_numpy_matrix(G))
+
+    G = nx.from_numpy_matrix(A)
+    s = make_beta_opinions(a, b, n, c1, c2)
+    s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
+    nx.set_node_attributes(G, s_dict, "innate")
+
+    return (c1, c2, G, s)
 
 
 def make_beta_opinions(a, b, n, c1, c2):
@@ -310,16 +338,16 @@ def make_pref_attach(n, G_0, m = 1, weighted = True):
 
     n0 = len(G_0.nodes())
 
-    init_G = nx.adjacency_matrix(G_0).A
+    init_A = nx.adjacency_matrix(G_0).A
 
     # create array containing each vertex's (weighted) degree
     links = np.zeros(n)
     for i in range(n0):
-        links[i] = np.sum(init_G[i, :])
+        links[i] = np.sum(init_A[i, :])
         
     # create n x n adjacency matrix with existing init_G
-    G = np.zeros((n, n))
-    G[:n0, :n0] = init_G
+    A = np.zeros((n, n))
+    A[:n0, :n0] = init_A
         
     graph_size = n0
     for i in range(n0, n):        
@@ -330,72 +358,80 @@ def make_pref_attach(n, G_0, m = 1, weighted = True):
         for v in vs:
             w = np.random.rand()
             if weighted:
-                G[i, v] = w
-                G[v, i] = w
+                A[i, v] = w
+                A[v, i] = w
                 links[i] += w
                 links[v] += w
 
             else:
-                G[i, v] = 1
-                G[v, i] = 1
+                A[i, v] = 1
+                A[v, i] = 1
                 links[i] += 1
                 links[v] += 1
     
         graph_size += 1
-        
-    return nx.from_numpy_matrix(G)
+
+    G = nx.from_numpy_matrix(A)
+
+    s = np.random.uniform(size = (n,1))
+    s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
+    nx.set_node_attributes(G, s_dict, "innate")
+                
+    return (G, s)
 
 
 
 
-
-########################### Getting Bounds ###########################
-
-
-def get_bounds(G, s, edge):
-    n = len(G.nodes())
-    z = get_expressed(G,s)
-    L = nx.laplacian_matrix(G).todense()
-    I = np.identity(n)
-    z_til = z - z.mean()
-
-    (eigs,_) = np.linalg.eig(L)
-    eigs.sort()
-
-    l_gap = eigs[1]
-    l_1 = eigs[n-1]
-
-    eps = (np.transpose(z_til) @ (np.identity(n)+L) @ (I[edge[0]] - I[edge[1]]))[0,0]/(np.transpose(z_til) @ (I[edge[0]] - I[edge[1]]))[0,0] - 1/(2+(1+l_gap)**2)
-    delta = ((z[edge[0]] - z[edge[1]])**2)[0,0]
-
-    P_0 = get_measure(G,s,'pol')
-
-    lb_r = (1-(2*eps*delta)/(3*n))*P_0
-    ub_r = P_0 - (1+l_1)/(3+l_1)*(2*(np.transpose(z_til) @ (np.identity(n)+L) @ np.outer(I[edge[0]] - I[edge[1]],I[edge[0]] - I[edge[1]]) @ z_til)[0,0])
-
-    lb_f = (-(2*eps*delta)/(3*n))*P_0
-    ub_f = - (1+l_1)/(3+l_1)*(2*(np.transpose(z_til) @ (np.identity(n)+L) @ np.outer(I[edge[0]] - I[edge[1]],I[edge[0]] - I[edge[1]]) @ z_til)[0,0])
-
-
-    return [[lb_f, ub_f], [lb_r, ub_r]]
 
 
 
 
 ########################### Optimization Heuritics ###########################
 
-def opt_max_dis(G, s, G0 = None, 
-                constraint = None, max_deg = None, max_deg_inc = None,
-                G_ops = None, bounds = False):
+
+
+def opt_random_add(G, s = None, nonedges = None,
+                   G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
+                   parallel = False, n_cores = -1):
+
+    # Goal: Optimization procedure based on adding non-edge that maximizes difference in fiedler vector values
+    #
+    # G: networkx Graph object on n nodes
+    # everything else: unused, exists for consistency with other functions
+    
+    n = len(G.nodes())
+    G_new = G.copy()  
+
+    if nonedges is None:
+        nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
+    
+    new_edge = list(nonedges)[np.random.choice(range(len(nonedges)), 1)[0]]
+
+    G_new.add_edges_from([new_edge])
+
+    return (G_new, nonedges.difference(set([new_edge])))
+
+
+
+
+
+def get_diff(x, i, j):
+    return abs(x[i] - x[j])
+
+
+def opt_max_dis(G, s, nonedges = None,
+                G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
+                G_ops = None, 
+                parallel = False, n_cores = -1):
 
     # Goal: Optimization procedure that adds non-edges with large expressed disagreement (w/ various optional constraints)
     #
     # G, G0: networkx Graph objects on n nodes (G0 is initial graph pre-perturbation, G is current)
     # s: (n,1) array-like, the innate opinions on G
-    # constraint: string, one of [None, 'max-deg', 'max-deg-inc'] indicating constraint on max dis heuristic
+    # constraint: string, one of [None, 'max-deg', 'max-deg-inc'] indicating constraint type
     # max_deg: scalar, maximum degree allowed in output graph
     # max_deg_inc: n-dim array-like, the maximum degree increase allowed for each node of the graph
-    # G_ops: optional, networkx Graph with which to check expressed opinions
+    # G_ops: optional, networkx Graph with which to compute expressed opinions to use
     
     n = len(G.nodes())
     G_new = G.copy()  
@@ -406,150 +442,167 @@ def opt_max_dis(G, s, G0 = None,
     else:
         x = get_expressed(G_ops,s)
 
-
-    nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
+    if nonedges is None:
+        nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
     
-    if constraint is None:
-        dis_nonedges = [(x[i] - x[j])**2 for (i,j) in nonedges]  
+    if not parallel:
+        if constraint is None:
+            obj_nonedges = [(x[i] - x[j])**2 for (i,j) in nonedges]  
 
-    elif constraint == 'max-deg':
-        if max_deg is None:
-            raise ValueError('Must pass a value for Max. Degree')
-        else:
-            dis_nonedges = [(x[i] - x[j])**2 if (max(d[i],d[j]) < max_deg) else 0 for (i,j) in nonedges] 
-        
-    elif constraint == 'max-deg-inc':
-        if max_deg_inc is None:
-            raise ValueError('Must pass an array-like for Max. Degree Increase')
-        else:
-            d0 = G0.degree()
-            dis_nonedges = [(x[i] - x[j])**2 if (d[i]-d0[i]<max_deg_inc[i] and d[j]-d0[j]<max_deg_inc[j]) else 0 for (i,j) in nonedges]  
-
-    new_edge = list(nonedges)[dis_nonedges.index(max(dis_nonedges))]
-
-    G_new.add_edges_from([new_edge])
-
-
-    if bounds:
-        return (G_new, get_bounds(G, s, new_edge))
-
+        elif constraint == 'max-deg':
+            if max_deg is None:
+                raise ValueError('Must pass a value for Max. Degree')
+            else:
+                obj_nonedges = [(x[i] - x[j])**2 if (max(d[i],d[j]) < max_deg) else 0 for (i,j) in nonedges] 
+            
+        elif constraint == 'max-deg-inc':
+            if max_deg_inc is None:
+                raise ValueError('Must pass an array-like for Max. Degree Increase')
+            else:
+                d0 = G0.degree()
+                obj_nonedges = [(x[i] - x[j])**2 if (d[i]-d0[i]<max_deg_inc[i] and d[j]-d0[j]<max_deg_inc[j]) else 0 for (i,j) in nonedges]  
 
     else:
-        return (G_new, [[None, None], [None, None]])
+        if constraint is None:
+            obj_nonedges = Parallel(n_jobs = n_cores)(delayed(get_diff)(x, i, j) for (i,j) in nonedges)
 
-
-
-
-
-
-def opt_max_grad(G, s, G0 = None, 
-                 constraint = None, max_deg = None, max_deg_inc = None,
-                 bounds = False):
-
-    # Goal: Optimization procedure that maximizes the derivative of polarization
-    #
-    # G: networkx Graph object on n nodes
-    # s: (n,1) array-like, the innate opinions on G
-    
-    n = len(G.nodes())
-    G_new = G.copy()  
-    d = G.degree()
-    x = get_expressed(G,s)
-    x_tilde = x - x.mean()
-
-    nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
-
-    # Precomputed for speed
-    IpL_inv = np.linalg.inv(np.identity(n)+ nx.laplacian_matrix(G).todense())
-    grad_pt_1 = 2*np.dot(np.transpose(x_tilde),IpL_inv)
-    I_n = np.identity(n)
-
-
-    if constraint is None:
-        obj_nonedges = [np.dot(grad_pt_1 @ np.outer(I_n[i]-I_n[j], I_n[i]-I_n[j]),x_tilde) for (i,j) in nonedges]
-
-    elif constraint == 'max-deg':
-        if max_deg is None:
-            raise ValueError('Must pass a value for Max. Degree')
         else:
-            obj_nonedges = [np.dot(grad_pt_1 @ np.outer(I_n[i]-I_n[j], I_n[i]-I_n[j]),x_tilde) if (max(d[i],d[j]) < max_deg) else -np.inf for (i,j) in nonedges]
-        
-    elif constraint == 'max-deg-inc':
-        if max_deg_inc is None:
-            raise ValueError('Must pass an array-like for Max. Degree Increase')
-        else:
-            d0 = G0.degree()
-            obj_nonedges = [np.dot(grad_pt_1 @ np.outer(I_n[i]-I_n[j], I_n[i]-I_n[j]),x_tilde) if (d[i]-d0[i]<max_deg_inc[i] and d[j]-d0[j]<max_deg_inc[j]) else -np.inf for (i,j) in nonedges]  
+            raise ValueError('Not Implemented...')
 
 
     new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
-
     G_new.add_edges_from([new_edge])
 
-
-    if bounds:
-        return (G_new, get_bounds(G, s, new_edge))
-
-
-    else:
-        return (G_new, [[None, None], [None, None]])
+    return (G_new, nonedges.difference(set([new_edge])))
 
 
 
-
-
-
-def opt_max_fiedler_diff(G, s = None, G0 = None, 
-                         constraint = None, max_deg = None, max_deg_inc = None,
-                         bounds = False):
+def opt_max_fiedler_diff(G, s = None, nonedges = None,
+                         G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
+                         parallel = False, n_cores = -1):
 
     # Goal: Optimization procedure based on adding non-edge that maximizes difference in fiedler vector values
     #
     # G: networkx Graph object on n nodes
     # s: unused, exists for consistency with other functions
+    # constraint: string, one of [None, 'max-deg', 'max-deg-inc'] indicating constraint type
+    # max_deg: scalar, maximum degree allowed in output graph
+    # max_deg_inc: n-dim array-like, the maximum degree increase allowed for each node of the graph
 
     n = len(G.nodes())
     G_new = G.copy()  
     d = G.degree()
 
-    nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
+    if nonedges is None:
+        nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
 
     L = nx.laplacian_matrix(G).todense()
     (l,V) = np.linalg.eig(L)
 
     v = V[:,list(l).index(np.sort(list(l))[1])]
 
-    if constraint is None:
-        obj_nonedges = [(v[i] - v[j])**2 for (i,j) in nonedges]
+    if not parallel:
+        if constraint is None:
+            obj_nonedges = [(v[i] - v[j])**2 for (i,j) in nonedges]
 
-    elif constraint == 'max-deg':
-        if max_deg is None:
-            raise ValueError('Must pass a value for Max. Degree')
-        else:
-            obj_nonedges = [(v[i] - v[j])**2 if (max(d[i],d[j]) < max_deg) else 0 for (i,j) in nonedges]
-        
-    elif constraint == 'max-deg-inc':
-        if max_deg_inc is None:
-            raise ValueError('Must pass an array-like for Max. Degree Increase')
-        else:
-            d0 = G0.degree()
-            obj_nonedges = [(v[i] - v[j])**2 if (d[i]-d0[i]<max_deg_inc[i] and d[j]-d0[j]<max_deg_inc[j]) else 0 for (i,j) in nonedges]  
-
-    '''
-    obj_nonedges = [(v[i] - v[j])**2 for (i,j) in nonedges] 
-    '''
-
-    new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
-
-    G_new.add_edges_from([new_edge])
-
-
-    if bounds:
-        return (G_new, [[None, None], [None, None]])
-
+        elif constraint == 'max-deg':
+            if max_deg is None:
+                raise ValueError('Must pass a value for Max. Degree')
+            else:
+                obj_nonedges = [(v[i] - v[j])**2 if (max(d[i],d[j]) < max_deg) else 0 for (i,j) in nonedges]
+            
+        elif constraint == 'max-deg-inc':
+            if max_deg_inc is None:
+                raise ValueError('Must pass an array-like for Max. Degree Increase')
+            else:
+                d0 = G0.degree()
+                obj_nonedges = [(v[i] - v[j])**2 if (d[i]-d0[i]<max_deg_inc[i] and d[j]-d0[j]<max_deg_inc[j]) else 0 for (i,j) in nonedges]  
 
     else:
-        return (G_new, [[None, None], [None, None]])
+        if constraint is None:
+            obj_nonedges = Parallel(n_jobs = n_cores)(delayed(get_diff)(v, i, j) for (i,j) in nonedges)
+
+        else:
+            raise ValueError('Not Implemented...')
+
+
+    new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
+    G_new.add_edges_from([new_edge])
+
+    return (G_new, nonedges.difference(set([new_edge])))
+
+
+
+
+
+
+
+def get_grad(grad_pt, i, j):
+    return grad_pt[i,i] + grad_pt[j,j] - 2*grad_pt[i,j]
+
+
+def opt_max_grad(G, s, nonedges = None,
+                 G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
+                 parallel = False, n_cores = -1):
+
+    # Goal: Optimization procedure that maximizes the derivative of polarization
+    #
+    # G: networkx Graph object on n nodes
+    # s: (n,1) array-like, the innate opinions on G
+    # constraint: string, one of [None, 'max-deg', 'max-deg-inc'] indicating constraint type
+    # max_deg: scalar, maximum degree allowed in output graph
+    # max_deg_inc: n-dim array-like, the maximum degree increase allowed for each node of the graph
+
+    n = len(G.nodes())
+    G_new = G.copy()  
+    d = G.degree()
+    x = get_expressed(G,s)
+    x_tilde = x - x.mean()
+
+    if nonedges is None:
+        nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
+
+
+    # Precomputed for speed
+    I_n = np.identity(n)
+    grad_pt = 2*np.outer(x_tilde, x_tilde) @ np.linalg.inv(I_n+ nx.laplacian_matrix(G).todense())
+
+    #sys.stdout.write("Computed Persistent Grad Matrix\n")
+    #sys.stdout.flush()
+
+
+    if not parallel:
+        if constraint is None:
+            obj_nonedges = [get_grad(grad_pt, i, j) for (i,j) in nonedges]
+
+
+        elif constraint == 'max-deg':
+            if max_deg is None:
+                raise ValueError('Must pass a value for Max. Degree')
+            else:
+                obj_nonedges = [get_grad(grad_pt, i, j) if (max(d[i],d[j]) < max_deg) else -np.inf for (i,j) in nonedges]
+            
+        elif constraint == 'max-deg-inc':
+            if max_deg_inc is None:
+                raise ValueError('Must pass an array-like for Max. Degree Increase')
+            else:
+                d0 = G0.degree()
+                obj_nonedges = [get_grad(grad_pt, i, j) if (d[i]-d0[i]<max_deg_inc[i] and d[j]-d0[j]<max_deg_inc[j]) else -np.inf for (i,j) in nonedges]  
+
+    else:
+        if constraint is None:
+            obj_nonedges = Parallel(n_jobs = n_cores)(delayed(get_grad)(grad_pt, i, j) for (i,j) in nonedges)
+
+        else:
+            raise ValueError('Not Implemented...')
+
+    #sys.stdout.write("Computed Objective\n")
+    #sys.stdout.flush()
+   
+    new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
+    G_new.add_edges_from([new_edge])
+
+    return (G_new, nonedges.difference(set([new_edge])))
 
 
 
@@ -558,9 +611,9 @@ def opt_max_fiedler_diff(G, s = None, G0 = None,
 
 def opt_stepwise_best(G, s, G0 = None, 
                       constraint = None, max_deg = None, max_deg_inc = None,
-                      bounds = False):
+                      bounds = False, parallel = False):
 
-    # Goal: Optimization procedure that maximizes the ratio of the derivative of polarization and the expressed disagreement
+    # Goal: Optimization procedure that adds the optimal edge stepwise
     #
     # G: networkx Graph object on n nodes
     # s: (n,1) array-like, innate opinions on G
@@ -568,130 +621,147 @@ def opt_stepwise_best(G, s, G0 = None,
     n = len(G.nodes())
     G_new = G.copy()  
     d = G.degree()
+    x = get_expressed(G,s)
+    x_tilde = x - x.mean()    
     
     nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
 
-    obj_nonedges = list()
+    # Precomputed for speed
+    IpL_inv = np.linalg.inv(np.identity(n)+ nx.laplacian_matrix(G).todense())
+    I_n = np.identity(n)
+
 
     if constraint is None:
-        for (i,j) in nonedges:
-            G_tmp = G.copy()
-
-            G_tmp.add_edge(i,j)
-            obj_nonedges.append(-get_measure(G_tmp,s))
+        obj_nonedges = [- x_tilde.T @ np.linalg.matrix_power(SM_inv(IpL_inv, I_n[i] - I_n[j], I_n[i] - I_n[j]), 2) @ x_tilde for (i,j) in nonedges]
+        #obj_nonedges = [- x_tilde.T @ np.linalg.inv(I_n + nx.laplacian_matrix(G).todense() + np.outer(I_n[i] - I_n[j], I_n[i] - I_n[j]))**2 @ x_tilde for (i,j) in nonedges]
 
     elif constraint == 'max-deg':
         if max_deg is None:
             raise ValueError('Must pass a value for Max. Degree')
-
         else:
-            for (i,j) in nonedges:
-                G_tmp = G.copy()
-
-                if max(d[i],d[j]) < max_deg:
-                    G_tmp.add_edge(i,j)
-                    obj_nonedges.append(-get_measure(G_tmp,s))
-                else:
-                    obj_nonedges.append(0)
+            obj_nonedges = [- x_tilde.T @ SM_inv(IpL_inv, I_n[i] - I_n[j], I_n[i] - I_n[j])**2 @ x_tilde if (max(d[i],d[j]) < max_deg) else -np.inf for (i,j) in nonedges]
         
     elif constraint == 'max-deg-inc':
         if max_deg_inc is None:
             raise ValueError('Must pass an array-like for Max. Degree Increase')
-
         else:
             d0 = G0.degree()
+            obj_nonedges = [- x_tilde.T @ SM_inv(IpL_inv, I_n[i] - I_n[j], I_n[i] - I_n[j])**2 @ x_tilde if (d[i]-d0[i]<max_deg_inc[i] and d[j]-d0[j]<max_deg_inc[j]) else -np.inf for (i,j) in nonedges]  
 
-            for (i,j) in nonedges:
-                G_tmp = G.copy()
-
-                if (d[i]-d0[i]<max_deg_inc[i] and d[j]-d0[j]<max_deg_inc[j]):
-                    G_tmp.add_edge(i,j)
-                    obj_nonedges.append(-get_measure(G_tmp,s))
-                else:
-                    obj_nonedges.append(0)
-
-    '''
-    obj_nonedges = list()
-
-    for (i,j) in nonedges:
-        G_tmp = G.copy()
-
-        G_tmp.add_edge(i,j)
-
-        obj_nonedges.append(-get_measure(G_tmp,s))
-    '''
 
     new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
-
     G_new.add_edges_from([new_edge])
 
-
-    if bounds:
-        return (G_new, get_bounds(G, s, new_edge))
-
-
-    else:
-        return (G_new, [[None, None], [None, None]])
+    return (G_new, nonedges.difference(set([new_edge])))
 
 
 
 
-########################### Optimization ###########################
+
+########################### Network Optimization ###########################
 
 
-def test_heuristics(G, s, k, G0 = None,
+def test_heuristics(funs, G, s, k = None, G0 = None,
                     constraint = None, max_deg = None, max_deg_inc = None,
-                    bounds = False):
-    
+                    parallel = False, n_cores = -1):
+        
+    if k is None:
+        #k = int(0.1*len(G.edges())) # Default to 10% of num. edges
+        k = int(0.5*len(G.nodes()))
+
     if max_deg_inc is not None:
         constraint = 'max-deg-inc'
         
     if max_deg is not None:
         constraint = 'max-deg'
     
-    df = pd.DataFrame(columns = ['type', 'constraint', 'pol_vec', 'bounds_full', 'bounds_rel',
-                                 'G_in', 's', 'G_out'], dtype = 'object')
+    df = pd.DataFrame(columns = ['type', 'constraint', 'pol_vec', 'homophily_vec', 's_gap_vec',
+                                 'G_in', 's', 'G_out', 'elapsed'], dtype = 'object')
     
-    for fn_name in ['opt_max_dis', 'opt_max_grad', 'opt_max_fiedler_diff']:#,'opt_max_grad_dis_ratio', 'opt_stepwise_best']:
-        print(fn_name)
+    for fn_name in funs:
+        sys.stdout.write("\n-----------------------------------\n"+ fn_name+"\n-----------------------------------\n")
+        sys.stdout.flush()
+
+        start = time.time()
 
         G_new = G.copy()
 
         pol_tmp = np.zeros(k+1)
         pol_tmp[0] = get_measure(G,s,'pol')
+        homophily_tmp = np.zeros(k+1)
+        homophily_tmp[0] = get_measure(G,s,'homophily')
+        s_gap_tmp = np.zeros(k+1)
+        s_gap_tmp[0] = get_measure(G,s,'spectral_gap')
 
-        bounds_tmp = [np.zeros((k+1,2)), np.zeros((k+1,2))]
-        bounds_tmp[0][0:] = [pol_tmp[0], pol_tmp[0]]
-        bounds_tmp[1][0:] = [pol_tmp[0], pol_tmp[0]]
+        sys.stdout.write("Progress: 0% Complete\n")
+        sys.stdout.flush()
+        prog = 10
+
+        nonedges = None
 
         for i in range(k):
-
-            (G_new, bounds) = eval(fn_name+'(G_new, s,'+
-                                 'G0 = G ,constraint = constraint, max_deg = max_deg,'+
-                                 'max_deg_inc = max_deg_inc, bounds = bounds)')
+           
+            (G_new, nonedges) = eval(fn_name+'(G_new, s,'+
+                                 'G0 = G0, constraint = constraint, max_deg = max_deg,'+
+                                 'max_deg_inc = max_deg_inc, nonedges = nonedges,'+
+                                 'parallel = parallel, n_cores = n_cores)')
 
             pol_tmp[i+1] = get_measure(G_new, s, 'pol')
-            bounds_tmp[0][i+1,:] = bounds[0]
-            bounds_tmp[1][i+1,:] = bounds[1]
-        
-        df_tmp = pd.DataFrame({'type': fn_name, 'constraint': constraint, 'pol_vec': None, 'bounds_full': None, 'bounds_rel': None,
-                               'G_in': None, 's': None, 'G_out': None}, index = [0], dtype = 'object')
-        
-        df_tmp.pol_vec.iloc[0] = pol_tmp#.tolist()
-        df_tmp.bounds_rel.iloc[0] = bounds_tmp[1]
-        if bounds:
-            if fn_name != 'opt_max_fiedler_diff':
-                df_tmp.bounds_full.iloc[0] = np.cumsum(bounds_tmp[0], axis = 0)
-            else:
-                df_tmp.bounds_full.iloc[0] = bounds_tmp[0]
-        df_tmp.G_in.iloc[0] = nx.adjacency_matrix(G).todense().tolist()
-        df_tmp.s.iloc[0] = np.transpose(s)[0,:]
-        df_tmp.G_out.iloc[0] = nx.adjacency_matrix(G_new).todense().tolist()
+            homophily_tmp[i+1] = get_measure(G_new, s,'homophily')
+            s_gap_tmp[i+1] = get_measure(G_new,s,'spectral_gap')
+            
+            if (i+1)*100/k >= prog:
+                sys.stdout.write("Progress: " +str(prog) + "% Complete\n")
+                sys.stdout.flush()
+                prog = prog + 10
+            
+            
+        end = time.time()
+        elapsed = np.round(end - start, 4)
 
-        df = df.append(df_tmp, ignore_index = True)
+        df_tmp = pd.DataFrame({'type': fn_name, 'constraint': constraint, 'pol_vec': None, 'homophily_vec': None, 's_gap_vec': None,
+                               'G_in': None, 's': None, 'G_out': None, 'elapsed': elapsed}, index = [0], dtype = 'object')
+        
+        df_tmp.at[0,'pol_vec'] = pol_tmp.tolist()
+        df_tmp.at[0,'homophily_vec'] = homophily_tmp.tolist()
+        df_tmp.at[0,'s_gap_vec'] = s_gap_tmp.tolist()
+        df_tmp.at[0,'G_in'] = nx.adjacency_matrix(G).todense().tolist()
+        df_tmp.at[0,'s'] = np.transpose(s)[0,:].tolist()
+        df_tmp.at[0,'G_out'] = nx.adjacency_matrix(G_new).todense().tolist()
 
-        #print(df)
+        df = pd.concat([df, df_tmp], ignore_index = True)
+
+        sys.stdout.write("Done. Elapsed Time: " + time.strftime('%H:%M:%S', time.gmtime(elapsed))+"\n")
+        sys.stdout.flush()
 
     return df
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
