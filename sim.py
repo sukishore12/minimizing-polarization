@@ -5,12 +5,15 @@ import networkx as nx
 from utils import *
 
 
+n_cores = -1 # number of cores to use for parallelization -- NOTE: parallel computation is only used for finding the optimal edge at every step
+
+
 funs = ['opt_random_add', 'opt_max_dis', 'opt_max_fiedler_diff',
-        'opt_max_grad']#, 'opt_stepwise_best', 'opt_random_flip']
+        'opt_max_grad']
 
 
 
-
+#'''
 ##### Reddit Network #####
 sys.stdout.write('----------------------- Reddit -----------------------\n')
 sys.stdout.flush()
@@ -97,5 +100,5 @@ np.random.seed(0)
 
 df = test_heuristics(funs, G_pa, s_pa, parallel = True, n_cores = n_cores)
 df.to_csv('data/out/raw/pa.csv')
-
+#'''
 

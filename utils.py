@@ -166,23 +166,6 @@ def load_blogs():
 
 
 
-def load_facebook():
-    edge_df = pd.read_csv('data/in/edges_fb.csv')
-
-    G = nx.from_pandas_edgelist(edge_df)
-
-    # get largest connected component only
-    G = G.subgraph(max(nx.connected_components(G), key=len))
-
-    ## This graph still has about 4k nodes -- too much... 
-
-    # change node labels to integers
-    G = nx.convert_node_labels_to_integers(G)
-
-    return
-
-
-
 
 def process_df_cols(df, cols):
     
@@ -735,33 +718,6 @@ def test_heuristics(funs, G, s, k = None, G0 = None,
         sys.stdout.flush()
 
     return df
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
