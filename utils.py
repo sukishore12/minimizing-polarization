@@ -98,7 +98,7 @@ def load_twitter():
             A[i-1, j-1] = 1
             A[j-1, i-1] = 1
 
-    G = nx.from_numpy_matrix(A)
+    G = nx.from_numpy_array(A)
     L = nx.laplacian_matrix(G).todense()
 
     s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
@@ -132,7 +132,7 @@ def load_reddit():
     A = np.delete(A, 52, 1)
     A = np.delete(A, 52, 0)
 
-    G = nx.from_numpy_matrix(A)
+    G = nx.from_numpy_array(A)
     L = nx.laplacian_matrix(G).todense()
 
     s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
