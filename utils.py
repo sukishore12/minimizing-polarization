@@ -214,7 +214,7 @@ def make_erdos_renyi(n, p, weighted = False):
                 # adjacency matrix is symmetric 
                 A[i][j] = A[j][i]
 
-    G = nx.from_numpy_matrix(A)
+    G = nx.from_numpy_array(A)
 
     s = np.random.uniform(size = (n,1))
     s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
@@ -283,7 +283,7 @@ def make_block(n, p1, p2, a, b, weighted = False):
             A[i][j] = A[j][i]
                 
 
-    G = nx.from_numpy_matrix(A)
+    G = nx.from_numpy_array(A)
     s = make_beta_opinions(a, b, n, c1, c2)
     s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
     nx.set_node_attributes(G, s_dict, "innate")
@@ -354,7 +354,7 @@ def make_pref_attach(n, G_0, m = 1, weighted = True):
     
         graph_size += 1
 
-    G = nx.from_numpy_matrix(A)
+    G = nx.from_numpy_array(A)
 
     s = np.random.uniform(size = (n,1))
     s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
