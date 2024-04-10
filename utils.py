@@ -17,6 +17,8 @@ from joblib import Parallel, delayed
 ########################### Useful Functions ###########################
 
 def flip_edge(G, i, j):
+    '''Creates edge between two nodes if edge is not present.
+    If edge already exists, removes.'''
     if (i,j) in list(G.edges()):
         G.remove_edge(i,j)
     else:
@@ -24,6 +26,7 @@ def flip_edge(G, i, j):
 
 
 def get_expressed(G,s):
+    '''Returns expressed opinions z, given by z = (I+L)^{-1} s'''
     n = len(G.nodes())
     L = nx.laplacian_matrix(G).todense()
     z = np.dot(np.linalg.inv(np.identity(n) + L), s) 
@@ -39,6 +42,7 @@ def get_measure(G, s, measure = 'pol'):
     s_mean = (s - np.mean(s)).reshape((len(s),1))
     z_mean = np.dot(np.linalg.inv(np.identity(n) + L), s_mean)
 
+    #Expressed Polarization
     if measure =='pol':
         return np.round(np.dot(np.transpose(z_mean), z_mean)[0,0], 4)
 
@@ -51,6 +55,7 @@ def get_measure(G, s, measure = 'pol'):
     elif measure == 'spectral_gap':
         return np.real(np.sort_complex(np.linalg.eigvals(L))[1])
 
+    # Assortivity of Innate Opinions
     elif measure == 'homophily':
         return np.round(nx.numeric_assortativity_coefficient(G,'innate'),4)
 
@@ -386,6 +391,7 @@ def opt_random_add(G, s = None, nonedges = None,
     G_new = G.copy()  
 
     if nonedges is None:
+        #find vertices not currently connected by an edge
         nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
     
     new_edge = list(nonedges)[np.random.choice(range(len(nonedges)), 1)[0]]
@@ -430,15 +436,19 @@ def opt_max_dis(G, s, nonedges = None,
     
     if not parallel:
         if constraint is None:
+            #Calculates objective function for each pair of nodes: disagreement D_{ij}(x) = (x_i - x_j)^2
             obj_nonedges = [(x[i] - x[j])**2 for (i,j) in nonedges]  
 
         elif constraint == 'max-deg':
+            #Only connects nodes that do not already exceed a maximum degree
             if max_deg is None:
                 raise ValueError('Must pass a value for Max. Degree')
             else:
                 obj_nonedges = [(x[i] - x[j])**2 if (max(d[i],d[j]) < max_deg) else 0 for (i,j) in nonedges] 
             
         elif constraint == 'max-deg-inc':
+            # Calculates similar objective function to none case, but checks that the increase in degree compared to
+            # degree found in G0 graph does not exceed some number
             if max_deg_inc is None:
                 raise ValueError('Must pass an array-like for Max. Degree Increase')
             else:
@@ -446,13 +456,14 @@ def opt_max_dis(G, s, nonedges = None,
                 obj_nonedges = [(x[i] - x[j])**2 if (d[i]-d0[i]<max_deg_inc[i] and d[j]-d0[j]<max_deg_inc[j]) else 0 for (i,j) in nonedges]  
 
     else:
+        #runs parallel jobs
         if constraint is None:
             obj_nonedges = Parallel(n_jobs = n_cores)(delayed(get_diff)(x, i, j) for (i,j) in nonedges)
 
         else:
             raise ValueError('Not Implemented...')
 
-
+    # Finds index of maximum objective function and corresponding two vertices. Adds an edge between these two vertices.
     new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
     G_new.add_edges_from([new_edge])
 
@@ -482,8 +493,10 @@ def opt_max_fiedler_diff(G, s = None, nonedges = None,
     L = nx.laplacian_matrix(G).todense()
     (l,V) = np.linalg.eig(L)
 
+    # Find second smallest eigenvector- Fiedler vector
     v = V[:,list(l).index(np.sort(list(l))[1])]
 
+    # Same objective function, this time with v instead of x
     if not parallel:
         if constraint is None:
             obj_nonedges = [(v[i] - v[j])**2 for (i,j) in nonedges]
@@ -513,9 +526,6 @@ def opt_max_fiedler_diff(G, s = None, nonedges = None,
     G_new.add_edges_from([new_edge])
 
     return (G_new, nonedges.difference(set([new_edge])))
-
-
-
 
 
 
@@ -553,7 +563,8 @@ def opt_max_grad(G, s, nonedges = None,
     #sys.stdout.write("Computed Persistent Grad Matrix\n")
     #sys.stdout.flush()
 
-
+    # Same as before, optimizing over gradient of polarization
+    # Coordinate descent
     if not parallel:
         if constraint is None:
             obj_nonedges = [get_grad(grad_pt, i, j) for (i,j) in nonedges]
@@ -591,7 +602,8 @@ def opt_max_grad(G, s, nonedges = None,
 
 
 
-
+# Described in section 4.2. Greedy stepwise approach where weight of k edges are saturated iteratively, one at a time. 
+# Simpler setting is tractable. 
 def opt_stepwise_best(G, s, G0 = None, 
                       constraint = None, max_deg = None, max_deg_inc = None,
                       bounds = False, parallel = False):
@@ -643,7 +655,7 @@ def opt_stepwise_best(G, s, G0 = None,
 
 ########################### Network Optimization ###########################
 
-
+# Measure heuristics for expressed polarization, spectral gap, assortativity of innate opinions
 def test_heuristics(funs, G, s, k = None, G0 = None,
                     constraint = None, max_deg = None, max_deg_inc = None,
                     parallel = False, n_cores = -1):
