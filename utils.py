@@ -73,7 +73,15 @@ def get_measure(G, s, measure = 'pol'):
         return np.round(np.dot(np.transpose(z_mean), z_mean)[0,0], 4)
 
     elif measure == 'dis':
-        return np.dot(np.dot(np.transpose(z_mean), L), z_mean)[0,0]  
+        return np.dot(np.dot(np.transpose(z_mean), L), z_mean)[0,0]
+
+    # Polarizatio-Disagreement Index
+    # I_{G,s} = P_{G,s} + D_{G,s}
+    elif measure == 'pol_dis':
+        pol = np.round(np.dot(np.transpose(z_mean), z_mean)[0,0], 4)
+        dis = np.dot(np.dot(np.transpose(z_mean), L), z_mean)[0,0]
+
+        return pol + dis
     
     elif measure == 'innate_dis':
         return np.dot(np.dot(np.transpose(s_mean), L), s_mean)[0,0] 
