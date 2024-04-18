@@ -17,8 +17,18 @@ from joblib import Parallel, delayed
 ########################### Useful Functions ###########################
 
 def flip_edge(G, i, j):
-    '''Creates edge between two nodes if edge is not present.
-    If edge already exists, removes.'''
+    """
+    Creates edge between two nodes if edge is not present.
+    If edge already exists, removes.
+
+    Inputs:
+        G (nx.Graph): graph
+        i, j: nodes to check edge existance
+    
+    Returns:
+        None
+    """
+
     if (i,j) in list(G.edges()):
         G.remove_edge(i,j)
     else:
@@ -26,7 +36,14 @@ def flip_edge(G, i, j):
 
 
 def get_expressed(G,s):
-    '''Returns expressed opinions z, given by z = (I+L)^{-1} s'''
+    """
+    Returns expressed opinions z, given by z = (I+L)^{-1} s
+
+    Inputs:
+        G (nx.Graph): graph
+        s (nd.array): innate opinion vector
+    """
+
     n = len(G.nodes())
     L = nx.laplacian_matrix(G).todense()
     z = np.dot(np.linalg.inv(np.identity(n) + L), s) 
@@ -35,6 +52,15 @@ def get_expressed(G,s):
         
 
 def get_measure(G, s, measure = 'pol'):
+    """
+    Returns specified measure given graph and innate opinions.
+
+    Inputs:
+        G (nx.Graph): graph
+        s (ndarray): array of innate opinions
+        measure (str): optional, measure to return
+    """
+
     n = len(G.nodes())
     e = len(G.edges())
     
@@ -42,7 +68,7 @@ def get_measure(G, s, measure = 'pol'):
     s_mean = (s - np.mean(s)).reshape((len(s),1))
     z_mean = np.dot(np.linalg.inv(np.identity(n) + L), s_mean)
 
-    #Expressed Polarization
+    # Expressed Polarization
     if measure =='pol':
         return np.round(np.dot(np.transpose(z_mean), z_mean)[0,0], 4)
 
@@ -64,7 +90,7 @@ def get_measure(G, s, measure = 'pol'):
         return
 
 
-def SM_inv(A_inv,u,v):
+def SM_inv(A_inv, u, v):
     return A_inv - (A_inv @ np.outer(u, v) @ A_inv)/(1+v.T @ A_inv @ u)
 
 
@@ -81,7 +107,8 @@ def load_twitter():
 
     s_df.columns = ["ID", "Tick", "Opinion"]
 
-    # we take the opinion from the last appearance of the vertex ID in the list as its innate opinion
+    # we take the opinion from the last appearance of the vertex ID in the list
+    # as its innate opinion
     s = s_df.groupby(["ID"]).last()["Opinion"].values.reshape(n, 1)
 
     s_last = s_df.groupby(["ID"]).first()["Opinion"].values.reshape(n, 1)
@@ -110,8 +137,6 @@ def load_twitter():
     nx.set_node_attributes(G, s_dict, "innate")
 
     return (n, s, A, G, L)
-
-
 
 
 def load_reddit():
@@ -170,10 +195,7 @@ def load_blogs():
     return (n, s, A, G, L)
 
 
-
-
 def process_df_cols(df, cols):
-    
     df_out = df.copy()
     
     for colname in cols:
@@ -193,11 +215,7 @@ def process_df_cols(df, cols):
     return df_out
 
 
-
-
 ########################### Graph Generation ###########################
-
-
 def make_erdos_renyi(n, p, weighted = False):
     rand_count = int(0.5*(n**2 - n))
     weights = scipy.sparse.random(1, rand_count, density = p).A[0]    
@@ -221,12 +239,13 @@ def make_erdos_renyi(n, p, weighted = False):
 
     G = nx.from_numpy_array(A)
 
-    s = np.random.uniform(size = (n,1))
+    # set innate opinions
+    s = np.random.uniform(size = (n,1)) # between 0 and 1
+    # multiplies innate opinions by 10, rounding to nearing int
     s_dict = dict(zip(np.arange(len(s)),[int(np.round(item*10)) for item in s]))
     nx.set_node_attributes(G, s_dict, "innate")
                 
     return (G, s)
-
 
 
 def make_block(n, p1, p2, a, b, weighted = False):
@@ -297,9 +316,19 @@ def make_block(n, p1, p2, a, b, weighted = False):
 
 
 def make_beta_opinions(a, b, n, c1, c2):
-    # create innate opinion vector with community 1 ~ beta(a, b), community 2 ~ beta(b, a)
-    # a and b parametrize the beta distribution
-    # c1 and c2 describe the partition of vertices into communities using SBM
+    """
+    Create innate opinion vector with community 1 ~ beta(a, b), 
+    community 2 ~ beta(b, a).
+
+    Inputs:
+        a and b: parametrize beta distribution
+        n (int): number of nodes
+        c1 and c2: describe partition of vertices into communities using SBM
+    
+    Returns:
+        s (ndarray): (n,1) innate opinion vector
+    """
+
     s1 = beta.rvs(a, b, size=int(n/2))
     s2 = beta.rvs(b, a, size=int(n/2))
 
@@ -319,10 +348,19 @@ def make_beta_opinions(a, b, n, c1, c2):
 
 
 def make_pref_attach(n, G_0, m = 1, weighted = True):
-    # create graph using preferential attachment model
-    # n: number of vertices the final graph has
-    # G_0: the graph to build on
-    # m: the number of nodes an incoming node connects to1
+    """
+    Create graph using preferential attachment model.
+
+    Inputs:
+        n (int): number of vertices the final graph has
+        G_0 (nx.Graph): graph to build on
+        m (int): number of nodes an incoming node connects to1
+    
+    Returns:
+        G (nx.Graph): graph of preferential attachment
+        s (ndarray): (n,1) innate opinion vector
+    """
+
 
     n0 = len(G_0.nodes())
 
@@ -368,25 +406,23 @@ def make_pref_attach(n, G_0, m = 1, weighted = True):
     return (G, s)
 
 
-
-
-
-
-
-
 ########################### Optimization Heuritics ###########################
-
-
-
 def opt_random_add(G, s = None, nonedges = None,
                    G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
                    parallel = False, n_cores = -1):
+    """
+    Goal: Optimization procedure based on adding non-edge that maximizes 
+            difference in fiedler vector values
 
-    # Goal: Optimization procedure based on adding non-edge that maximizes difference in fiedler vector values
-    #
-    # G: networkx Graph object on n nodes
-    # everything else: unused, exists for consistency with other functions
+    Inputs:
+        G (nx.Graph): networkx Graph object on n nodes
+        everything else: unused, exists for consistency with other functions
     
+    Returns:
+        G_new (nx.Graph): updated graph with new optimal edge
+        new_edge (tuple): new edge added
+    """
+
     n = len(G.nodes())
     G_new = G.copy()  
 
@@ -401,9 +437,6 @@ def opt_random_add(G, s = None, nonedges = None,
     return (G_new, nonedges.difference(set([new_edge])))
 
 
-
-
-
 def get_diff(x, i, j):
     return abs(x[i] - x[j])
 
@@ -412,16 +445,27 @@ def opt_max_dis(G, s, nonedges = None,
                 G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
                 G_ops = None, 
                 parallel = False, n_cores = -1):
-
-    # Goal: Optimization procedure that adds non-edges with large expressed disagreement (w/ various optional constraints)
-    #
-    # G, G0: networkx Graph objects on n nodes (G0 is initial graph pre-perturbation, G is current)
-    # s: (n,1) array-like, the innate opinions on G
-    # constraint: string, one of [None, 'max-deg', 'max-deg-inc'] indicating constraint type
-    # max_deg: scalar, maximum degree allowed in output graph
-    # max_deg_inc: n-dim array-like, the maximum degree increase allowed for each node of the graph
-    # G_ops: optional, networkx Graph with which to compute expressed opinions to use
+    """
+    Goal: Optimization procedure that adds non-edges with large 
+        expressed disagreement (w/ various optional constraints)
     
+    Inputs:
+        G (nx.Graph): current graph object on n nodes
+        G0 (nx.Graph): initial graph object pre-perturbation
+        s (ndarray): (n,1) array-like, the innate opinions on G
+        constraint (str): one of [None, 'max-deg', 'max-deg-inc'] 
+                            indicating constraint type
+        max_deg (int): scalar, maximum degree allowed in output graph
+        max_deg_inc (ndarray): n-dim array-like, the maximum degree increase 
+                                allowed for each node of the graph
+        G_ops (nx.Graph): optional, graph with which to compute expressed 
+                            opinions to use
+    
+    Returns:
+        G_new (nx.Graph): updated graph with new optimal edge
+        new_edge (tuple): new edge added
+    """
+
     n = len(G.nodes())
     G_new = G.copy()  
     d = G.degree()
@@ -474,14 +518,22 @@ def opt_max_dis(G, s, nonedges = None,
 def opt_max_fiedler_diff(G, s = None, nonedges = None,
                          G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
                          parallel = False, n_cores = -1):
+    """
+    Goal: Optimization procedure based on adding non-edge that maximizes difference in fiedler vector values
+    
+    Inputs:
+        G (nx.Graph): networkx Graph object on n nodes
+        s: unused, exists for consistency with other functions
+        constraint (str): string, one of [None, 'max-deg', 'max-deg-inc'] 
+                            indicating constraint type
+        max_deg (int): scalar, maximum degree allowed in output graph
+        max_deg_inc (ndarray): n-dim array-like, the maximum degree increase 
+                                allowed for each node of the graph
 
-    # Goal: Optimization procedure based on adding non-edge that maximizes difference in fiedler vector values
-    #
-    # G: networkx Graph object on n nodes
-    # s: unused, exists for consistency with other functions
-    # constraint: string, one of [None, 'max-deg', 'max-deg-inc'] indicating constraint type
-    # max_deg: scalar, maximum degree allowed in output graph
-    # max_deg_inc: n-dim array-like, the maximum degree increase allowed for each node of the graph
+    Returns:
+        G_new (nx.Graph): updated graph with new optimal edge
+        new_edge (tuple): new edge added
+    """
 
     n = len(G.nodes())
     G_new = G.copy()  
@@ -537,14 +589,22 @@ def get_grad(grad_pt, i, j):
 def opt_max_grad(G, s, nonedges = None,
                  G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
                  parallel = False, n_cores = -1):
-
-    # Goal: Optimization procedure that maximizes the derivative of polarization
-    #
-    # G: networkx Graph object on n nodes
-    # s: (n,1) array-like, the innate opinions on G
-    # constraint: string, one of [None, 'max-deg', 'max-deg-inc'] indicating constraint type
-    # max_deg: scalar, maximum degree allowed in output graph
-    # max_deg_inc: n-dim array-like, the maximum degree increase allowed for each node of the graph
+    """
+    Goal: Optimization procedure that maximizes the derivative of polarization
+    
+    Inputs:
+        G (nx.Graph): graph object on n nodes
+        s (ndarray): (n,1) array-like, the innate opinions on G
+        constraint (str): one of [None, 'max-deg', 'max-deg-inc']
+                          indicating constraint type
+        max_deg (int): scalar, maximum degree allowed in output graph
+        max_deg_inc (ndarray): n-dim array-like, the maximum degree increase 
+                            allowed for each node of the graph
+    
+    Returns:
+        G_new (nx.Graph): updated graph with new optimal edge
+        new_edge (tuple): new edge added
+    """
 
     n = len(G.nodes())
     G_new = G.copy()  
@@ -599,19 +659,22 @@ def opt_max_grad(G, s, nonedges = None,
     return (G_new, nonedges.difference(set([new_edge])))
 
 
-
-
-
-# Described in section 4.2. Greedy stepwise approach where weight of k edges are saturated iteratively, one at a time. 
-# Simpler setting is tractable. 
 def opt_stepwise_best(G, s, G0 = None, 
                       constraint = None, max_deg = None, max_deg_inc = None,
                       bounds = False, parallel = False):
+    """
+    Goal: Optimization procedure that adds the optimal edge stepwise.
+    Greedy stepwise approach where weight of k edges are saturated iteratively,
+    one at a time. Simpler setting is tractable. Described in section 4.2. 
 
-    # Goal: Optimization procedure that adds the optimal edge stepwise
-    #
-    # G: networkx Graph object on n nodes
-    # s: (n,1) array-like, innate opinions on G
+    Inputs:
+        G (nx.Graph): graph on n nodes
+        s (ndarray): (n,1) array-like, innate opinions on G
+
+    Returns:
+        G_new (nx.Graph): updated graph with new optimal edge
+        new_edge (tuple): new edge added
+    """
 
     n = len(G.nodes())
     G_new = G.copy()  
@@ -654,12 +717,20 @@ def opt_stepwise_best(G, s, G0 = None,
 
 
 ########################### Network Optimization ###########################
-
-# Measure heuristics for expressed polarization, spectral gap, assortativity of innate opinions
 def test_heuristics(funs, G, s, k = None, G0 = None,
                     constraint = None, max_deg = None, max_deg_inc = None,
                     parallel = False, n_cores = -1):
-        
+    """
+    Measure heuristics for expressed polarization, spectral gap, 
+    assortativity of innate opinions.
+
+    Inputs:
+        funs (List[str]): list of functions to optimize over 
+                        ex: ['opt_random_add', 'opt_max_dis']
+        G (nx.Graph): input graph
+        k (int): planner's budget
+    """ 
+
     if k is None:
         #k = int(0.1*len(G.edges())) # Default to 10% of num. edges
         k = int(0.5*len(G.nodes()))
