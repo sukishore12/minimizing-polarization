@@ -736,7 +736,7 @@ def test_heuristics(funs, G, s, k = None, G0 = None,
         funs (List[str]): list of functions to optimize over 
                         ex: ['opt_random_add', 'opt_max_dis']
         G (nx.Graph): input graph
-        k (int): planner's budget
+        k (int): planner's budget, default: half of number of nodes
     """ 
 
     if k is None:
@@ -749,8 +749,10 @@ def test_heuristics(funs, G, s, k = None, G0 = None,
     if max_deg is not None:
         constraint = 'max-deg'
     
-    df = pd.DataFrame(columns = ['type', 'constraint', 'pol_vec', 'homophily_vec', 's_gap_vec',
-                                 'G_in', 's', 'G_out', 'elapsed'], dtype = 'object')
+    df = pd.DataFrame(columns = ['type', 'constraint', 'pol_vec', 
+                                 'pol_dis_vec', 'homophily_vec', 's_gap_vec',
+                                 'G_in', 's', 'G_out', 'elapsed'], 
+                                 dtype = 'object')
     
     for fn_name in funs:
         sys.stdout.write("\n-----------------------------------\n"+ fn_name+"\n-----------------------------------\n")
@@ -762,6 +764,9 @@ def test_heuristics(funs, G, s, k = None, G0 = None,
 
         pol_tmp = np.zeros(k+1)
         pol_tmp[0] = get_measure(G,s,'pol')
+        # Added
+        pol_dis_tmp = np.zeros(k+1)
+        pol_dis_tmp[0] = get_measure(G,s,'pol_dis')
         homophily_tmp = np.zeros(k+1)
         homophily_tmp[0] = get_measure(G,s,'homophily')
         s_gap_tmp = np.zeros(k+1)
@@ -774,13 +779,15 @@ def test_heuristics(funs, G, s, k = None, G0 = None,
         nonedges = None
 
         for i in range(k):
-           
+            # this is where the optimization functions is called
             (G_new, nonedges) = eval(fn_name+'(G_new, s,'+
                                  'G0 = G0, constraint = constraint, max_deg = max_deg,'+
                                  'max_deg_inc = max_deg_inc, nonedges = nonedges,'+
                                  'parallel = parallel, n_cores = n_cores)')
 
             pol_tmp[i+1] = get_measure(G_new, s, 'pol')
+            # Added
+            pol_dis_tmp[i+1] = get_measure(G_new, s, 'pol_dis')
             homophily_tmp[i+1] = get_measure(G_new, s,'homophily')
             s_gap_tmp[i+1] = get_measure(G_new,s,'spectral_gap')
             
@@ -793,10 +800,15 @@ def test_heuristics(funs, G, s, k = None, G0 = None,
         end = time.time()
         elapsed = np.round(end - start, 4)
 
-        df_tmp = pd.DataFrame({'type': fn_name, 'constraint': constraint, 'pol_vec': None, 'homophily_vec': None, 's_gap_vec': None,
-                               'G_in': None, 's': None, 'G_out': None, 'elapsed': elapsed}, index = [0], dtype = 'object')
+        df_tmp = pd.DataFrame({'type': fn_name, 'constraint': constraint, 
+                               'pol_vec': None, 'pol_dis_vec': None,
+                               'homophily_vec': None, 
+                               's_gap_vec': None, 'G_in': None, 
+                               's': None, 'G_out': None, 'elapsed': elapsed}, 
+                               index = [0], dtype = 'object')
         
         df_tmp.at[0,'pol_vec'] = pol_tmp.tolist()
+        df_tmp.at[0,'pol_dis_vec'] = pol_dis_tmp.tolist()
         df_tmp.at[0,'homophily_vec'] = homophily_tmp.tolist()
         df_tmp.at[0,'s_gap_vec'] = s_gap_tmp.tolist()
         df_tmp.at[0,'G_in'] = nx.adjacency_matrix(G).todense().tolist()

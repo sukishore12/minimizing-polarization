@@ -4,13 +4,14 @@ import networkx as nx
 
 from utils import *
 
-
-n_cores = -1 # number of cores to use for parallelization -- NOTE: parallel computation is only used for finding the optimal edge at every step
+# number of cores to use for parallelization 
+# NOTE: parallel computation is only used for finding 
+# the optimal edge at every step
+n_cores = -1 
 
 
 funs = ['opt_random_add', 'opt_max_dis', 'opt_max_fiedler_diff',
         'opt_max_grad']
-
 
 
 #'''
