@@ -202,6 +202,57 @@ def load_blogs():
 
     return (n, s, A, G, L)
 
+def random_opinion_graph(graph_data):
+    """
+    Returns a graph with the same number of vertices, adjacency matrix, graph, and laplacian matrix.
+    This graph will have random innate opinions to mimic opinions on a different issue.
+
+    Inputs:
+        graph_data: output of load functions
+            n: number of vertices
+            s: original innate opinions
+            A: adjacency matrix
+            G: graph
+            L: Laplacian matrix
+    """
+    n, _, A, G, L = graph_data
+
+    s_random = np.random.rand(n, 1)
+
+    graph_data_new = (n, s_random, A, G, L)
+    
+    return graph_data_new
+
+def related_opinion_graph(graph_data, correlation_factor=0.5, noise_level=0.1):
+    """
+    Returns a graph with the same number of vertices, adjacency matrix, graph, and laplacian matrix.
+    This graph will have different innate opinions to mimic opinions on a different issue.
+    These opinions are correlated with the original opinion. 
+    Question: How uncorrelated can we make these to still see an effect?
+
+    Inputs:
+        graph_data: output of load functions
+            n: number of vertices
+            s: original innate opinions
+            A: adjacency matrix
+            G: graph
+            L: Laplacian matrix
+        correlation_factor: determines how correlated to make new innate opinions
+        noise_level: noise added to calculation
+    """
+    n, s_twitter, A, G, L = graph_data
+    
+    transformation_matrix = np.eye(n) + correlation_factor * np.random.randn(n, n)
+
+    s_new = np.dot(transformation_matrix, s_twitter)
+
+    s_new += noise_level * np.random.randn(n, 1)
+
+    s_new = np.clip(s_new, 0, 1)
+
+    graph_data_new = (n, s_new, A, G, L)
+    
+    return graph_data_new
 
 def process_df_cols(df, cols):
     df_out = df.copy()
@@ -419,8 +470,7 @@ def opt_random_add(G, s = None, nonedges = None,
                    G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
                    parallel = False, n_cores = -1):
     """
-    Goal: Optimization procedure based on adding non-edge that maximizes 
-            difference in fiedler vector values
+    Goal: Optimization procedure based on adding a random non-edge
 
     Inputs:
         G (nx.Graph): networkx Graph object on n nodes
