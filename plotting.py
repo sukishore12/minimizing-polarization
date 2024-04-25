@@ -129,15 +129,38 @@ def graph_node_distance(names,
         data = pd.read_csv('data/out/raw/'+name+'.csv', index_col = 0)
         df = process_df_cols(data, ['s', 'G_in', 'G_out'])
 
-        # Initial graph
-        G_0 = nx.from_numpy_matrix(np.array(df.G_in.iloc[0]))
+        f, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=False)
 
+
+        # Initial graph
+        G_prev = nx.from_numpy_array(np.array(df.G_in.iloc[0]))
+        distances = []
         # Process each updated graph
         for i in range(len(df)):
-            G_tmp = nx.from_numpy_matrix(np.array(df.G_out.iloc[i]))
+            G_in = nx.from_numpy_array(np.array(df.G_in.iloc[i]))
+            G_out = nx.from_numpy_array(np.array(df.G_out.iloc[i]))
+            difference = nx.difference(G_out, G_in)
+            print(f'{len(difference.edges)}')
+            print(f'# new edges: {len(difference.edges)}')
+            diff_edges = difference.edges
+            print(diff_edges)
+            graph_dist = []
+            for edge in diff_edges:
+                node1, node2 = edge
+                distance = nx.shortest_path_length(G_in, node1, node2)
+                graph_dist.append(distance)
+
+            # Plot a histogram of the graph_dist values
+            plt.clf()
+            plt.hist(graph_dist, bins=10, color='skyblue', edgecolor='black')
+            plt.xlabel('Shortest Path Length')
+            plt.ylabel('Frequency')
+            plt.title('Histogram of Shortest Path Lengths for Different Edges')
+            plt.savefig(f'fig/{name}_pre_dist_{i}.pdf')
 
 if __name__ == "__main__":
     names = {'rd': 'Reddit'} # for testing
+    names = {'tw': 'Twitter'}
     # budget_and_pol(names, LEGEND, LINESTYLES)
     graph_node_distance(names, LEGEND, LINESTYLES)
     
