@@ -202,58 +202,6 @@ def load_blogs():
 
     return (n, s, A, G, L)
 
-def random_opinion_graph(graph_data):
-    """
-    Returns a graph with the same number of vertices, adjacency matrix, graph, and laplacian matrix.
-    This graph will have random innate opinions to mimic opinions on a different issue.
-
-    Inputs:
-        graph_data: output of load functions
-            n: number of vertices
-            s: original innate opinions
-            A: adjacency matrix
-            G: graph
-            L: Laplacian matrix
-    """
-    n, _, A, G, L = graph_data
-
-    s_random = np.random.rand(n, 1)
-
-    graph_data_new = (n, s_random, A, G, L)
-    
-    return graph_data_new
-
-def related_opinion_graph(graph_data, correlation_factor=0.5, noise_level=0.1):
-    """
-    Returns a graph with the same number of vertices, adjacency matrix, graph, and laplacian matrix.
-    This graph will have different innate opinions to mimic opinions on a different issue.
-    These opinions are correlated with the original opinion. 
-    Question: How uncorrelated can we make these to still see an effect?
-
-    Inputs:
-        graph_data: output of load functions
-            n: number of vertices
-            s: original innate opinions
-            A: adjacency matrix
-            G: graph
-            L: Laplacian matrix
-        correlation_factor: determines how correlated to make new innate opinions
-        noise_level: noise added to calculation
-    """
-    n, s_twitter, A, G, L = graph_data
-    
-    transformation_matrix = np.eye(n) + correlation_factor * np.random.randn(n, n)
-
-    s_new = np.dot(transformation_matrix, s_twitter)
-
-    s_new += noise_level * np.random.randn(n, 1)
-
-    s_new = np.clip(s_new, 0, 1)
-
-    graph_data_new = (n, s_new, A, G, L)
-    
-    return graph_data_new
-
 def process_df_cols(df, cols):
     df_out = df.copy()
     
@@ -492,16 +440,21 @@ def opt_random_add(G, s = None, nonedges = None,
 
     G_new.add_edges_from([new_edge])
 
-    return (G_new, nonedges.difference(set([new_edge])))
+    return (G_new, nonedges.difference(set([new_edge])), new_edge)
 
 
 def get_diff(x, i, j):
     return abs(x[i] - x[j])
 
 
-def opt_max_dis(G, s, nonedges = None,
-                G0 = None, constraint = None, max_deg = None, max_deg_inc = None,
+def opt_max_dis(G, s, 
+                nonedges = None,
+                G0 = None, 
+                constraint = None, 
+                max_deg = None, 
+                max_deg_inc = None,
                 G_ops = None, 
+                find_min_dis = False,
                 parallel = False, n_cores = -1):
     """
     Goal: Optimization procedure that adds non-edges with large 
@@ -521,7 +474,8 @@ def opt_max_dis(G, s, nonedges = None,
     
     Returns:
         G_new (nx.Graph): updated graph with new optimal edge
-        new_edge (tuple): new edge added
+        nonedge (tuple): remaining non-edges
+        new_edge (): new edge added
     """
 
     n = len(G.nodes())
@@ -566,10 +520,13 @@ def opt_max_dis(G, s, nonedges = None,
             raise ValueError('Not Implemented...')
 
     # Finds index of maximum objective function and corresponding two vertices. Adds an edge between these two vertices.
-    new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
+    if find_min_dis is False: # choose nodes with largest disagreement
+        new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
+    else: # choose nodes with smallest disagreement
+        new_edge = list(nonedges)[obj_nonedges.index(min(obj_nonedges))]
     G_new.add_edges_from([new_edge])
 
-    return (G_new, nonedges.difference(set([new_edge])))
+    return (G_new, nonedges.difference(set([new_edge])), new_edge)
 
 
 
@@ -635,7 +592,7 @@ def opt_max_fiedler_diff(G, s = None, nonedges = None,
     new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
     G_new.add_edges_from([new_edge])
 
-    return (G_new, nonedges.difference(set([new_edge])))
+    return (G_new, nonedges.difference(set([new_edge])), new_edge)
 
 
 
@@ -714,7 +671,7 @@ def opt_max_grad(G, s, nonedges = None,
     new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
     G_new.add_edges_from([new_edge])
 
-    return (G_new, nonedges.difference(set([new_edge])))
+    return (G_new, nonedges.difference(set([new_edge])), new_edge)
 
 
 def opt_stepwise_best(G, s, G0 = None, 
@@ -768,7 +725,7 @@ def opt_stepwise_best(G, s, G0 = None,
     new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
     G_new.add_edges_from([new_edge])
 
-    return (G_new, nonedges.difference(set([new_edge])))
+    return (G_new, nonedges.difference(set([new_edge])), new_edge)
 
 
 
@@ -830,7 +787,7 @@ def test_heuristics(funs, G, s, k = None, G0 = None,
 
         for i in range(k):
             # this is where the optimization functions is called
-            (G_new, nonedges) = eval(fn_name+'(G_new, s,'+
+            (G_new, nonedges, _) = eval(fn_name+'(G_new, s,'+
                                  'G0 = G0, constraint = constraint, max_deg = max_deg,'+
                                  'max_deg_inc = max_deg_inc, nonedges = nonedges,'+
                                  'parallel = parallel, n_cores = n_cores)')

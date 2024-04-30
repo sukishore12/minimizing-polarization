@@ -175,5 +175,7 @@ def graph_node_distance(names,
 
 if __name__ == "__main__":
     names = {'rd': 'Reddit'} # for testing
-    graph_node_distance(NAMES, LEGEND, LINESTYLES)
-    
+    # graph_node_distance(NAMES, LEGEND, LINESTYLES)
+    names = {'tw_rand': 'Twitter and Random Opinion'} # for testing
+    legend = {'opt_max_dis': 'DS of G2'}
+    budget_and_pol(names, legend, LINESTYLES)
