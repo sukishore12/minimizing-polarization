@@ -1,56 +1,39 @@
 from utils import *
+import random
 
-def random_opinion_graph(graph_data):
+def random_opinion_graph(s):
     """
-    Returns a graph with the same number of vertices, adjacency matrix, graph, and laplacian matrix.
-    This graph will have random innate opinions to mimic opinions on a different issue.
+    Returns a set of opinions of the same length as the innate set of opinions. 
+    These will mimic opinions on a different issue 2.
 
-    Inputs:
-        graph_data: output of load functions
-            n: number of vertices
-            s: original innate opinions
-            A: adjacency matrix
-            G: graph
-            L: Laplacian matrix
+    Input:
+       s: original innate opinions
+    Output: 
+        s_random: randoly generated innate opinions
+
     """
-    n, _, A, G, L = graph_data
-
-    s_random = np.random.rand(n, 1)
-
-    graph_data_new = (n, s_random, A, G, L)
+    s_random = np.random.rand(len(s), 1)
     
-    return graph_data_new
+    return s_random
 
-def related_opinion_graph(graph_data, correlation_factor=0.5, noise_level=0.1):
+def related_opinion_graph(n, s, noise=0.1):
     """
-    Returns a graph with the same number of vertices, adjacency matrix, graph, and laplacian matrix.
+    Returns new set of opinions. 
     This graph will have different innate opinions to mimic opinions on a different issue.
-    These opinions are correlated with the original opinion. 
-    Question: How uncorrelated can we make these to still see an effect?
+    These opinions are different from the original opinion by some noise factor. 
+    Question: How uncorrelated can we make these to still see an effect? Lower noise = more correlation.
 
     Inputs:
-        graph_data: output of load functions
-            n: number of vertices
-            s: original innate opinions
-            A: adjacency matrix
-            G: graph
-            L: Laplacian matrix
-        correlation_factor: determines how correlated to make new innate opinions
+        s: original innate opinion
         noise_level: noise added to calculation
     """
-    n, s_twitter, A, G, L = graph_data
     
-    transformation_matrix = np.eye(n) + correlation_factor * np.random.randn(n, n)
-
-    s_new = np.dot(transformation_matrix, s_twitter)
-
-    s_new += noise_level * np.random.randn(n, 1)
-
-    s_new = np.clip(s_new, 0, 1)
-
-    graph_data_new = (n, s_new, A, G, L)
+    s_new = []
+    for value in s:
+        interpolated_value = value * (1 - noise) + random.random() * noise
+        s_new.append(interpolated_value)
+    return s_new
     
-    return graph_data_new
 
 # TODO
 # Function that takes new edge from G2 algorithm and adds to G1(politics) graph
