@@ -1,5 +1,6 @@
 from utils import *
 import random
+from tqdm import tqdm
 
 def random_opinion_graph(s):
     """
@@ -16,7 +17,7 @@ def random_opinion_graph(s):
     
     return s_random
 
-def related_opinion_graph(n, s, noise=0.1):
+def related_opinion_graph(s, noise=0.1):
     """
     Returns new set of opinions. 
     This graph will have different innate opinions to mimic opinions on a different issue.
@@ -25,7 +26,7 @@ def related_opinion_graph(n, s, noise=0.1):
 
     Inputs:
         s: original innate opinion
-        noise_level: noise added to calculation
+        noise: noise added to calculation
     """
     
     s_new = []
@@ -58,8 +59,9 @@ def test_heuristics_two_graphs(G1, G2, s1, s2, k = None, G0 = None,
     """ 
 
     if k is None:
-        #k = int(0.1*len(G.edges())) # Default to 10% of num. edges
-        k = int(0.5*len(G1.nodes()))
+        k = int(0.1*len(G1.edges())) # Default to 10% of num. edges
+        # k = int(0.5*len(G1.nodes()))
+        print(f'Planner budget: {k}')
 
     if max_deg_inc is not None:
         constraint = 'max-deg-inc'
@@ -99,14 +101,15 @@ def test_heuristics_two_graphs(G1, G2, s1, s2, k = None, G0 = None,
         #                      'G0 = G0, constraint = constraint, max_deg = max_deg,'+
         #                      'max_deg_inc = max_deg_inc, nonedges = nonedges,'+
         #                      'parallel = parallel, n_cores = n_cores)')
-        (G2_new, nonedge, new_edge) = opt_max_dis(G2, s2, find_min_dis=True) # finding MIN
-        G1_new.add_edges_from([new_edge])
+        (G2_new, nonedge, new_edge) = opt_max_dis(G2_new, s2, find_min_dis=True) # finding MIN
+        G1_new.add_edge(*new_edge)
 
         pol_tmp[i+1] = get_measure(G1_new, s1, 'pol')
         # Added
         pol_dis_tmp[i+1] = get_measure(G1_new, s1, 'pol_dis')
+
         homophily_tmp[i+1] = get_measure(G1_new, s1,'homophily')
-        s_gap_tmp[i+1] = get_measure(G1_new,s1,'spectral_gap')
+        s_gap_tmp[i+1] = get_measure(G1_new, s1,'spectral_gap')
         
         if (i+1)*100/k >= prog:
             sys.stdout.write("Progress: " +str(prog) + "% Complete\n")

@@ -38,70 +38,34 @@ def budget_and_pol(names, legend, linestyles,
         print('\n################\n'+name)
         data = pd.read_csv('data/out/raw/'+name+'.csv', index_col = 0)
 
-        df = process_df_cols(data, ['pol_vec', 'pol_dis_vec', 's'])
+        df = process_df_cols(data, ['pol_vec', 'pol_dis_vec', 'homophily_vec', 's'])
 
         # Remove column of poor-performing optimization heuristic
         df = df.loc[df.type != 'opt_max_grad_dis_ratio']
+        # y = df.homophily_vec.iloc[0]
+        # x = np.arange(len(df.homophily_vec.iloc[0]))
+        # plt.plot(x, y)
+        # plt.show()
 
         # f,ax = plt.subplots(figsize = (8,6))
         f, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=False)
         
-        if log:
-            # plt.yscale('log')
-            axes[0].set_yscale('log')
-            axes[1].set_yscale('log')
-
-        # K_n is ER graph 
-        (K_n,_) = make_erdos_renyi(len(df.s[0]), 1, weighted = False)
-        s = np.transpose(np.array([df.s[0]])) - np.mean(df.s[0])
-        
-        pol_K_n = get_measure(K_n,s,'pol')
-        dis_K_n = get_measure(K_n,s,'dis')
-        pol_dis_K_n = get_measure(K_n,s,'pol_dis')
-
-        axes[0].hlines(y=pol_K_n, xmin = 0, xmax = len(df.pol_vec[0]),
-                linestyle='-', linewidth = 5, color = 'k',
-                label = 'Best, $K_n$')
-
-        # ax1.hlines(y=pol_K_n, xmin = 0, xmax = len(df.pol_vec[0]),
-        #           linestyle='-', linewidth = 5, color = 'k',
-        #           label = 'Best, $K_n$')
-        
-        axes[1].hlines(y=pol_dis_K_n, xmin = 0, xmax = len(df.pol_vec[0]),
-                linestyle='-', linewidth = 5, color = 'k',
-                label = 'Best, $K_n$')
-        
-        if innate:
-            pol_K_0 = np.var(df.s.iloc[0])*len(df.s.iloc[0])
-
-            axes[0].hlines(y=pol_K_0, xmin = 0, xmax = len(df.pol_vec[0]),
-                    linestyle=':', linewidth = 3, color = 'g',
-                    label = 'Innate Polarization')
-
-            # ax1.hlines(y=pol_K_0, xmin = 0, xmax = len(df.pol_vec[0]),
-            #           linestyle=':', linewidth = 3, color = 'g',
-            #           label = 'Innate Polarization')
-        
-        print('initial', df.pol_vec.iloc[0][0])
-        print('best', pol_K_n)
-        
-        if innate:
-            print('worst', pol_K_0)
+        # print('initial', df.pol_vec.iloc[0][0])
+        # pol_vec = df.pol_vec[0]
+        # plt.plot(pol_vec)
+        # plt.show()
             
-        for i in range(len(df)):
-            # graph business
-            print(df.type.iloc[i], df.pol_vec.iloc[i][len(df.pol_vec.iloc[i])-1])
-            # plt.plot(pol_dis_K_n[i], linestyle = linestyles[i],
-            #     label = legend[df.type.iloc[i]], linewidth = 3)
-            # Previous plotting
-            axes[0].plot(df.pol_vec.iloc[i], linestyle = linestyles[i],
-                    label = legend[df.type.iloc[i]], linewidth = 3)
-            axes[1].plot(df.pol_dis_vec.iloc[i], linestyle = linestyles[i],
-                    label = legend[df.type.iloc[i]], linewidth = 3)
-    #        plt.plot(np.array(df.pol_vec.iloc[i])/df.pol_vec.iloc[i][0],
-    #                 label = legend[df.type.iloc[i]], linewidth = 3)
+        # for i in range(len(df.pol_vec[0])):
+        #     # graph business
+        #     print(df.type.iloc[i], df.pol_vec.iloc[i][i])
+        for i in range(len(df.pol_vec[0])):
+            axes[0].plot(df.homophily_vec.iloc[0][i], 
+                         linestyle = 'dotted', linewidth = 3)
+            axes[0].plot(df.pol_vec.iloc[0][i], 
+                         linestyle = 'solid', linewidth = 3)
+            axes[1].plot(df.pol_dis_vec.iloc[0][i],
+                         linestyle = 'dashed', linewidth = 3)
 
-        axes[0].tick_params(direction='in', width=1.5)
         axes[0].set_title(f'{names[name]}')
         axes[0].legend(loc='lower left')
         axes[0].set_ylabel('Resulting Polarization, $P(\mathbf{z}\')$')
@@ -115,7 +79,7 @@ def budget_and_pol(names, legend, linestyles,
     #    plt.ylabel(r'Fraction of Remaining Polarization, $\frac{P(\mathbf{z}\')}{P(\mathbf{z})}$')
     #    plt.title('Performance of Polarization-Minimizing Heuristics for '+names[name]+ ' Network',
     #             position = (0.5,0.9))
-        
+        plt.show()
         if save:
             os.makedirs("fig/pol_dis/", exist_ok=True)
             plt.savefig('fig/pol_dis/'+name+'_pol.pdf')
@@ -173,9 +137,102 @@ def graph_node_distance(names,
         f.suptitle(f'{names[name]}')
         f.savefig(f'fig/{name}_pre_dist_{name}.png')
 
+
+def plot_budget(innate = False,
+                log = False,
+                names = None,
+                linestyles = None):
+    # for testing
+    for name in names.keys():
+    # for name in names.keys()[0]:
+        print('\n################\n'+name)
+        datas = []
+        dfs = []
+
+        data2 = pd.read_csv('data/out/raw/tw_rand_point2.csv', index_col = 0)
+        df2 = process_df_cols(data2, ['pol_vec', 'pol_dis_vec', 's'])
+
+        data3 = pd.read_csv('data/out/raw/tw_rand_point3.csv', index_col = 0)
+        df3 = process_df_cols(data3, ['pol_vec', 'pol_dis_vec', 's'])
+
+        data4 = pd.read_csv('data/out/raw/tw_rand_point4.csv', index_col = 0)
+        df4 = process_df_cols(data4, ['pol_vec', 'pol_dis_vec', 's'])      
+
+        data5 = pd.read_csv('data/out/raw/tw_rand_point5.csv', index_col = 0)
+        df5 = process_df_cols(data5, ['pol_vec', 'pol_dis_vec', 's'])       
+        
+        data6 = pd.read_csv('data/out/raw/tw_rand_point6.csv', index_col = 0)
+        df6 = process_df_cols(data6, ['pol_vec', 'pol_dis_vec', 's'])
+
+        data7 = pd.read_csv('data/out/raw/tw_rand_point7.csv', index_col = 0)
+        df7 = process_df_cols(data7, ['pol_vec', 'pol_dis_vec', 's'])
+
+        data8 = pd.read_csv('data/out/raw/tw_rand_point8.csv', index_col = 0)
+        df8 = process_df_cols(data8, ['pol_vec', 'pol_dis_vec', 's'])
+
+        # f,ax = plt.subplots(figsize = (8,6))
+        f, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=False)
+
+        print('initial', df2.pol_vec.iloc[0][0])
+
+        for i in range(len(df2)):
+            # graph business
+            # print(df.type.iloc[i], df.pol_vec.iloc[i][len(df.pol_vec.iloc[i])-1])
+            # plt.plot(pol_dis_K_n[i], linestyle = linestyles[i],
+            #     label = legend[df.type.iloc[i]], linewidth = 3)
+            # Previous plotting
+            axes[0].plot(df2.pol_vec.iloc[i], linestyle = linestyles[i],
+                    label = 0.2, linewidth = 3)
+            axes[1].plot(df2.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+                    label = 0.2, linewidth = 3)
+            # axes[0].plot(df3.pol_vec.iloc[i], linestyle = linestyles[i],
+            #         label = 0.3, linewidth = 3)
+            # axes[1].plot(df3.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+            #         label = 0.3, linewidth = 3)
+            axes[0].plot(df4.pol_vec.iloc[i], linestyle = linestyles[i],
+                    label = 0.4, linewidth = 3)
+            axes[1].plot(df4.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+                    label = 0.4, linewidth = 3)
+            # axes[0].plot(df5.pol_vec.iloc[i], linestyle = linestyles[i],
+            #         label = 0.5, linewidth = 3)
+            # axes[1].plot(df5.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+            #         label = 0.5, linewidth = 3)
+            axes[0].plot(df6.pol_vec.iloc[i], linestyle = linestyles[i],
+                    label = 0.6, linewidth = 3)
+            axes[1].plot(df6.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+                    label = 0.6, linewidth = 3)
+            # axes[0].plot(df7.pol_vec.iloc[i], linestyle = linestyles[i],
+            #         label = 0.7, linewidth = 3)
+            # axes[1].plot(df7.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+            #         label = 0.7, linewidth = 3)
+            axes[0].plot(df8.pol_vec.iloc[i], linestyle = linestyles[i],
+                    label = 0.8, linewidth = 3)
+            axes[1].plot(df8.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+                    label = 0.8, linewidth = 3)
+    #        plt.plot(np.array(df.pol_vec.iloc[i])/df.pol_vec.iloc[i][0],
+    #                 label = legend[df.type.iloc[i]], linewidth = 3)
+
+        axes[0].tick_params(direction='in', width=1.5)
+        axes[0].set_title(f'{names[name]}')
+        axes[0].legend(loc='lower left')
+        axes[0].set_ylabel('Resulting Polarization, $P(\mathbf{z}\')$')
+        axes[0].set_xlabel('Planner\'s Budget, $k$')
+
+        axes[1].set_xlabel('Planner\'s Budget, $k$')
+        axes[1].set_ylabel('Resulting Disagreement+Polarization, $P(\mathbf{z}\')$')
+
+        axes[1].tick_params(direction='in', width=1.5)
+        axes[1].legend(loc='lower left')
+    #    plt.ylabel(r'Fraction of Remaining Polarization, $\frac{P(\mathbf{z}\')}{P(\mathbf{z})}$')
+    #    plt.title('Performance of Polarization-Minimizing Heuristics for '+names[name]+ ' Network',
+    #             position = (0.5,0.9))
+        
+        plt.savefig('fig/C'+name+'_pol.pdf')
+
 if __name__ == "__main__":
     names = {'rd': 'Reddit'} # for testing
     # graph_node_distance(NAMES, LEGEND, LINESTYLES)
-    names = {'tw_rand': 'Twitter and Random Opinion'} # for testing
+    names = {'tw_rand': 'Twitter and Random Opinion, Varying $\mathbf{n}$'} # for testing
     legend = {'opt_max_dis': 'DS of G2'}
-    budget_and_pol(names, legend, LINESTYLES)
+    # budget_and_pol(names, legend, LINESTYLES)
+    plot_budget(names=names, linestyles=LINESTYLES)

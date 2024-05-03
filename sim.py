@@ -14,19 +14,23 @@ n_cores = -1
 funs = ['opt_random_add', 'opt_max_dis', 'opt_max_fiedler_diff',
         'opt_max_grad']
 
+funs = ['opt_max_dis'] # for testing related opinion graph
+
 ##### Two Opinions #####
-def twitter_random():
+def twitter_random(n=3):
         sys.stdout.write('----------------------- Twitter and Random -----------------------\n')
         sys.stdout.flush()
 
         (n_tw, s_tw, A_tw, G_tw, L_tw) = load_twitter()
-        (n_rand, s_rand, A_rand, G_rand, L_rand) = random_opinion_graph((n_tw, s_tw, A_tw, G_tw, L_tw))
+        G_new = G_tw.copy()
+        s_new = related_opinion_graph(s_tw, n * 0.1)
 
-
-        df = test_heuristics_two_graphs(G_tw, G2=G_rand, 
-                                        s1=s_tw, s2=s_rand, 
+        df = test_heuristics_two_graphs(G_tw, G2=G_new, 
+                                        s1=s_tw, s2=s_new, 
                                         parallel = True, n_cores = n_cores)
-        df.to_csv('data/out/raw/tw_rand.csv')
+        
+        # df = test_heuristics(funs, G_tw, s=s_tw, parallel = True, n_cores = n_cores)
+        df.to_csv(f'data/out/raw/tw_rand_point{n}.csv')
 
 
 #'''
