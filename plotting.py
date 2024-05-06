@@ -88,6 +88,9 @@ def graph_node_distance(names,
                         legend, 
                         linestyles,
                         save=True):
+    """
+    Plot histogram of node distance distribution before addition of new edges.
+    """
     for name in names.keys():
         print('\n################\n'+name)
         data = pd.read_csv('data/out/raw/'+name+'.csv', index_col = 0)
@@ -138,79 +141,27 @@ def graph_node_distance(names,
         f.savefig(f'fig/{name}_pre_dist_{name}.png')
 
 
-def plot_budget(innate = False,
-                log = False,
+def plot_budget(root_dir='data/out/raw/tw',
                 names = None,
                 linestyles = None):
-    # for testing
+    print(f'Plotting from {root_dir}')
     for name in names.keys():
-    # for name in names.keys()[0]:
-        print('\n################\n'+name)
-        datas = []
-        dfs = []
-
-        data2 = pd.read_csv('data/out/raw/tw_rand_point2.csv', index_col = 0)
-        df2 = process_df_cols(data2, ['pol_vec', 'pol_dis_vec', 's'])
-
-        data3 = pd.read_csv('data/out/raw/tw_rand_point3.csv', index_col = 0)
-        df3 = process_df_cols(data3, ['pol_vec', 'pol_dis_vec', 's'])
-
-        data4 = pd.read_csv('data/out/raw/tw_rand_point4.csv', index_col = 0)
-        df4 = process_df_cols(data4, ['pol_vec', 'pol_dis_vec', 's'])      
-
-        data5 = pd.read_csv('data/out/raw/tw_rand_point5.csv', index_col = 0)
-        df5 = process_df_cols(data5, ['pol_vec', 'pol_dis_vec', 's'])       
-        
-        data6 = pd.read_csv('data/out/raw/tw_rand_point6.csv', index_col = 0)
-        df6 = process_df_cols(data6, ['pol_vec', 'pol_dis_vec', 's'])
-
-        data7 = pd.read_csv('data/out/raw/tw_rand_point7.csv', index_col = 0)
-        df7 = process_df_cols(data7, ['pol_vec', 'pol_dis_vec', 's'])
-
-        data8 = pd.read_csv('data/out/raw/tw_rand_point8.csv', index_col = 0)
-        df8 = process_df_cols(data8, ['pol_vec', 'pol_dis_vec', 's'])
-
-        # f,ax = plt.subplots(figsize = (8,6))
+        print(f'\n################\n{name}')
         f, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=False)
 
-        print('initial', df2.pol_vec.iloc[0][0])
+        for file_name in sorted(os.listdir(root_dir)):
+            data0 = pd.read_csv(os.path.join(root_dir, file_name), index_col = 0)
+            df0 = process_df_cols(data0, ['pol_vec', 'pol_dis_vec', 's', 'threshold'])
+            threshold = df0.threshold.iloc[0]
+            name_first, _ = os.path.splitext(file_name)
+            label_val = name_first.split('_')[-1]
 
-        for i in range(len(df2)):
-            # graph business
-            # print(df.type.iloc[i], df.pol_vec.iloc[i][len(df.pol_vec.iloc[i])-1])
-            # plt.plot(pol_dis_K_n[i], linestyle = linestyles[i],
-            #     label = legend[df.type.iloc[i]], linewidth = 3)
-            # Previous plotting
-            axes[0].plot(df2.pol_vec.iloc[i], linestyle = linestyles[i],
-                    label = 0.2, linewidth = 3)
-            axes[1].plot(df2.pol_dis_vec.iloc[i], linestyle = linestyles[i],
-                    label = 0.2, linewidth = 3)
-            # axes[0].plot(df3.pol_vec.iloc[i], linestyle = linestyles[i],
-            #         label = 0.3, linewidth = 3)
-            # axes[1].plot(df3.pol_dis_vec.iloc[i], linestyle = linestyles[i],
-            #         label = 0.3, linewidth = 3)
-            axes[0].plot(df4.pol_vec.iloc[i], linestyle = linestyles[i],
-                    label = 0.4, linewidth = 3)
-            axes[1].plot(df4.pol_dis_vec.iloc[i], linestyle = linestyles[i],
-                    label = 0.4, linewidth = 3)
-            # axes[0].plot(df5.pol_vec.iloc[i], linestyle = linestyles[i],
-            #         label = 0.5, linewidth = 3)
-            # axes[1].plot(df5.pol_dis_vec.iloc[i], linestyle = linestyles[i],
-            #         label = 0.5, linewidth = 3)
-            axes[0].plot(df6.pol_vec.iloc[i], linestyle = linestyles[i],
-                    label = 0.6, linewidth = 3)
-            axes[1].plot(df6.pol_dis_vec.iloc[i], linestyle = linestyles[i],
-                    label = 0.6, linewidth = 3)
-            # axes[0].plot(df7.pol_vec.iloc[i], linestyle = linestyles[i],
-            #         label = 0.7, linewidth = 3)
-            # axes[1].plot(df7.pol_dis_vec.iloc[i], linestyle = linestyles[i],
-            #         label = 0.7, linewidth = 3)
-            axes[0].plot(df8.pol_vec.iloc[i], linestyle = linestyles[i],
-                    label = 0.8, linewidth = 3)
-            axes[1].plot(df8.pol_dis_vec.iloc[i], linestyle = linestyles[i],
-                    label = 0.8, linewidth = 3)
-    #        plt.plot(np.array(df.pol_vec.iloc[i])/df.pol_vec.iloc[i][0],
-    #                 label = legend[df.type.iloc[i]], linewidth = 3)
+            for i in range(len(df0)):
+                axes[0].plot(df0.pol_vec.iloc[i], linestyle = linestyles[i],
+                        label = label_val, linewidth = 3)
+                axes[1].plot(df0.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+                        label = label_val, linewidth = 3)
+
 
         axes[0].tick_params(direction='in', width=1.5)
         axes[0].set_title(f'{names[name]}')
@@ -223,16 +174,16 @@ def plot_budget(innate = False,
 
         axes[1].tick_params(direction='in', width=1.5)
         axes[1].legend(loc='lower left')
-    #    plt.ylabel(r'Fraction of Remaining Polarization, $\frac{P(\mathbf{z}\')}{P(\mathbf{z})}$')
-    #    plt.title('Performance of Polarization-Minimizing Heuristics for '+names[name]+ ' Network',
-    #             position = (0.5,0.9))
         
-        plt.savefig('fig/C'+name+'_pol.pdf')
+        plt.savefig('fig/min'+name+'_pol.pdf')
 
 if __name__ == "__main__":
     names = {'rd': 'Reddit'} # for testing
     # graph_node_distance(NAMES, LEGEND, LINESTYLES)
-    names = {'tw_rand': 'Twitter and Random Opinion, Varying $\mathbf{n}$'} # for testing
+    names_tw = {'tw_rand': 'Twitter and Random Opinion, Varying $\mathbf{n}$'} # for testing
+    names_rd = {'rd_rand': 'Reddit and Random Opinion, Varying $\mathbf{n}$'}
     legend = {'opt_max_dis': 'DS of G2'}
     # budget_and_pol(names, legend, LINESTYLES)
-    plot_budget(names=names, linestyles=LINESTYLES)
+    plot_budget(root_dir='data/out/raw/tw', names=names_tw, linestyles=LINESTYLES)
+    plot_budget(root_dir='data/out/raw/rd', names=names_rd, linestyles=LINESTYLES)
+
