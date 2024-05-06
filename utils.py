@@ -2,6 +2,7 @@ import sys
 import numpy as np
 import pandas as pd
 import networkx as nx
+import math
 import matplotlib.pyplot as plt
 import scipy
 import scipy.io
@@ -325,7 +326,8 @@ def make_block(n, p1, p2, a, b, weighted = False):
 def make_beta_opinions(a, b, n, c1, c2):
     """
     Create innate opinion vector with community 1 ~ beta(a, b), 
-    community 2 ~ beta(b, a).
+    community 2 ~ beta(b, a). Used to make stochastic block 
+    model networks.
 
     Inputs:
         a and b: parametrize beta distribution
@@ -351,7 +353,6 @@ def make_beta_opinions(a, b, n, c1, c2):
             idx2 += 1
             
     return s
-
 
 
 def make_pref_attach(n, G_0, m = 1, weighted = True):
@@ -446,6 +447,49 @@ def opt_random_add(G, s = None, nonedges = None,
 def get_diff(x, i, j):
     return abs(x[i] - x[j])
 
+def opt_min_dis(G1, s1, G2, s2,
+                constraint: str = None,
+                threshold: float = None,
+                nonedges = None
+                ):
+    '''
+    Goal: Optimization procedure that adds non-edges to G1 over
+    constraint in G2 expressed opinions
+    '''
+    n = len(G1.nodes())
+    G1_new = G1.copy() 
+    G2_new = G2.copy()  
+
+    x1 = get_expressed(G1, s1)
+    x2 = get_expressed(G2, s2)
+
+    if nonedges is None:
+        # non-edges in G1
+        nonedges = set(itertools.combinations(range(n),2)).difference(set(G1_new.edges()))
+    
+        if constraint is None:
+            #Calculates objective function for each pair of nodes: disagreement D_{ij}(x) = (x_i - x_j)^2
+            obj_nonedges = [(x1[i] - x1[j])**2 for (i,j) in nonedges]  
+
+        elif constraint == 'g2_max_dis':
+            obj_nonedges = []
+            if threshold is None:
+                raise ValueError('Must pass a value for function param threshold')
+            for (i, j) in nonedges:
+                # x is from G_ops
+                if (x2[i] - x2[j])**2 < threshold: # over G2
+                    obj_nonedges.append((x1[i] - x1[j])**2) # over G1
+                else:
+                    obj_nonedges.append(math.inf)
+            
+    # Finds index of MIN objective function and corresponding two vertices. 
+    # Adds an edge between these two vertices.
+    # choose nodes with smallest disagreement
+    new_edge = list(nonedges)[obj_nonedges.index(min(obj_nonedges))]
+    G1_new.add_edges_from([new_edge])
+    G2_new.add_edges_from([new_edge])
+
+    return (G2_new, nonedges.difference(set([new_edge])), new_edge)
 
 def opt_max_dis(G, s, 
                 nonedges = None,
@@ -786,6 +830,7 @@ def test_heuristics(funs, G, s, k = None, G0 = None,
         nonedges = None
 
         for i in range(k):
+            G_prev = G_new
             # this is where the optimization functions is called
             (G_new, nonedges, _) = eval(fn_name+'(G_new, s,'+
                                  'G0 = G0, constraint = constraint, max_deg = max_deg,'+

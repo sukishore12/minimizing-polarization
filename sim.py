@@ -1,4 +1,5 @@
 import sys
+import os
 import numpy as np
 import networkx as nx
 
@@ -17,8 +18,9 @@ funs = ['opt_random_add', 'opt_max_dis', 'opt_max_fiedler_diff',
 funs = ['opt_max_dis'] # for testing related opinion graph
 
 ##### Two Opinions #####
-def twitter_random(n=3):
-        sys.stdout.write('----------------------- Twitter and Random -----------------------\n')
+def twitter_random(n=3, threshold=None):
+        sys.stdout.write('---------------- Twitter and Random -----------------------\n')
+        sys.stdout.write(f'-------------------- n = {n} -----------------------\n')
         sys.stdout.flush()
 
         (n_tw, s_tw, A_tw, G_tw, L_tw) = load_twitter()
@@ -26,11 +28,31 @@ def twitter_random(n=3):
         s_new = related_opinion_graph(s_tw, n * 0.1)
 
         df = test_heuristics_two_graphs(G_tw, G2=G_new, 
-                                        s1=s_tw, s2=s_new, 
-                                        parallel = True, n_cores = n_cores)
+                                        s1=s_tw, s2=s_new,
+                                        threshold=threshold)
         
         # df = test_heuristics(funs, G_tw, s=s_tw, parallel = True, n_cores = n_cores)
-        df.to_csv(f'data/out/raw/tw_rand_point{n}.csv')
+        os.makedirs(f'data/out/raw/tw', exist_ok=True)
+        df.to_csv(f'data/out/raw/tw/constraint_{threshold}_tw_rand_{n}.csv')
+
+
+##### Two Opinions #####
+def reddit_random(n=3, threshold=None):
+        sys.stdout.write('----------------------- Reddit and Random -----------------------\n')
+        sys.stdout.flush()
+
+        (n_tw, s_tw, A_tw, G_tw, L_tw) = load_reddit()
+        G_new = G_tw.copy()
+        s_new = related_opinion_graph(s_tw, n * 0.1)
+
+        df = test_heuristics_two_graphs(G_tw, G2=G_new, 
+                                        s1=s_tw, s2=s_new,
+                                        threshold=threshold)
+        
+        os.makedirs(f'data/out/raw/rd', exist_ok=True)
+        # df = test_heuristics(funs, G_tw, s=s_tw, parallel = True, n_cores = n_cores)
+        df.to_csv(f'data/out/raw/rd/constraint_rd_rand_{n}.csv')
+
 
 
 #'''
@@ -43,10 +65,7 @@ def reddit():
 
         df = test_heuristics(funs, G_rd, s_rd, parallel = True, n_cores = n_cores)
         df.to_csv('data/out/raw/rd.csv')    
-'''
 
-
-'''
 ##### Twitter Network #####
 def twitter():
         sys.stdout.write('----------------------- Twitter -----------------------\n')
@@ -55,11 +74,9 @@ def twitter():
         (n_tw, s_tw, A_tw, G_tw, L_tw) = load_twitter()
 
         df = test_heuristics(funs, G_tw, s_tw, parallel = True, n_cores = n_cores)
+        
         df.to_csv('data/out/raw/tw.csv')
-'''
 
-
-'''
 ##### Blogs Network #####
 def blogs():
         sys.stdout.write('----------------------- Blogs -----------------------\n')
@@ -69,10 +86,7 @@ def blogs():
 
         df = test_heuristics(funs, G_bg, s_bg, parallel = True, n_cores = n_cores)
         df.to_csv('data/out/raw/bg.csv')
-'''
 
-
-'''
 ##### Erdos-Renyi Network #####
 def erdos_renyi():
         sys.stdout.write('----------------------- Erdos-Renyi -----------------------\n')
@@ -86,10 +100,8 @@ def erdos_renyi():
 
         df = test_heuristics(funs, G_er, s_er, parallel = True, n_cores = n_cores)
         df.to_csv('data/out/raw/er.csv')
-'''
 
 
-'''
 ##### Stockastic Block Model Network #####
 def sbm():
         sys.stdout.write('----------------------- Stochastic Block Model -----------------------\n')
@@ -106,10 +118,7 @@ def sbm():
 
         df = test_heuristics(funs, G_sbm, s_sbm, parallel = True, n_cores = n_cores)
         df.to_csv('data/out/raw/sbm.csv')
-'''
 
-
-'''
 ##### Preferential Attachment Network #####
 def pref_attach():
         sys.stdout.write('----------------------- Preferential Attachment -----------------------\n')
@@ -130,4 +139,14 @@ def pref_attach():
 
 
 if __name__ == "__main__":
-        twitter_random()
+        # reddit_random(2)
+        # reddit_random(4)
+        # reddit_random(6)
+        # reddit_random(8)
+        threshold = 0.5
+        # twitter_random(2, threshold)
+        twitter_random(4, threshold)
+        twitter_random(6, threshold)
+        twitter_random(8, threshold)
+
+
