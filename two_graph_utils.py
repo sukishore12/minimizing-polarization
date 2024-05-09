@@ -47,6 +47,58 @@ def related_opinion_graph(s, noise, n_runs=10):
 # Function that takes new edge from G2 algorithm and adds to G1(politics) graph
 # then calls test_heurestics 
 
+# Initially, tried to just edit original fiedler function to accomodate another constraint.
+#This works(?) but did not seem to be the cleanest code. Now, attempting to make a similar function for the 2Graph context.
+# Can incorporate this code into utils functions when proven to perform correctly.
+
+def opt_max_fiedler_diff(G1, nonedges = None, G2 = None, s2 = None, max_g2_dis = None,
+                         parallel = False, n_cores = -1):
+    """
+    Goal: Optimization procedure based on adding non-edge that maximizes difference in fiedler vector values.
+    Edge is chosen to maximize Fiedler diffrence in G1. The points connected must have a calculated disagreement within set bounds.
+    
+    Inputs:
+        G1 (nx.Graph): networkx Graph object on n nodes
+        G2: (nx.Graph): networkx Graph object on n nodes
+        s2: Opinions array corresponding to G2
+        max_g2_dis: Maximum disagreement allowed between newly connected nodes. Calculated using s2.
+
+    Returns:
+        G1_new (nx.Graph): updated graph with new optimal edge
+        G2_new (nx.Graph): updated graph with new optimal edge
+        new_edge (tuple): new edge added
+    """
+
+    n = len(G1.nodes())
+    G1_new = G1.copy()  
+    G2_new = G2.copy()  
+    d = G1.degree()
+
+    if nonedges is None:
+        nonedges = set(itertools.combinations(range(n),2)).difference(set(G1_new.edges()))
+
+    L = nx.laplacian_matrix(G1).todense()
+    (l,V) = np.linalg.eig(L)
+
+    # Find second smallest eigenvector- Fiedler vector
+    v = V[:,list(l).index(np.sort(list(l))[1])]
+
+    x2 = get_expressed(G2, s2)
+
+    # Same objective function, this time with v instead of x
+    if not parallel:
+        obj_nonedges = [(v[i] - v[j])**2 if ((x2[i] - x2[j])**2 < max_g2_dis) else 0 for (i,j) in nonedges]  
+
+    else:
+        obj_nonedges = Parallel(n_jobs = n_cores)(delayed(get_diff)(v, i, j) for (i,j) in nonedges)
+
+
+    new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
+    G1_new.add_edges_from([new_edge])
+    G2_new.add_edges_from([new_edge])
+
+    return (G1_new, G2_new, nonedges.difference(set([new_edge])), new_edge)
+
 
 ########################### Network Optimization ###########################
 def test_heuristics_two_graphs(G1, G2, s1, s2, 
