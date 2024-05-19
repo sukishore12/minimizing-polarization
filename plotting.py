@@ -5,6 +5,7 @@ import scipy.io
 import itertools
 import seaborn as sns
 import os
+from datetime import datetime
 
 from utils import *
 
@@ -19,8 +20,9 @@ LINESTYLES = ['-', '--', '-.', ':']
 '''
 Setup
 '''
-LEGEND = {'opt_max_dis': 'DS', 'opt_max_grad': 'CD', 
-          'opt_max_fiedler_diff': 'FD', 'opt_random_add': 'Random'}
+legend = {'opt_max_dis': 'DS', 'opt_max_grad': 'CD', 
+          'opt_max_fiedler_diff': 'FD', 'opt_random_add': 'Random',
+          'common_ground': 'CG'}
 
 NAMES = {'rd': 'Reddit', 'tw': 'Twitter', 'bg': 'Political Blogs',
          'er': 'Erdös-Rényi', 'sbm': 'Stochastic Block',
@@ -140,7 +142,6 @@ def graph_node_distance(names,
         f.suptitle(f'{names[name]}')
         f.savefig(f'fig/{name}_pre_dist_{name}.png')
 
-
 def plot_budget(root_dir='data/out/raw/tw',
                 names = None,
                 linestyles = None):
@@ -148,11 +149,11 @@ def plot_budget(root_dir='data/out/raw/tw',
     for name in names.keys():
         print(f'\n################\n{name}')
         f, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=False)
-
-        for file_name in sorted(os.listdir(root_dir)):
+        all_files = sorted(os.listdir(root_dir))
+        for file_name in all_files:
             data0 = pd.read_csv(os.path.join(root_dir, file_name), index_col = 0)
-            df0 = process_df_cols(data0, ['pol_vec', 'pol_dis_vec', 's', 'threshold'])
-            threshold = df0.threshold.iloc[0]
+            df0 = process_df_cols(data0, ['pol_vec', 'pol_dis_vec', 's'])
+            threshold = data0.threshold[0]
             name_first, _ = os.path.splitext(file_name)
             label_val = name_first.split('_')[-1]
 
@@ -165,6 +166,67 @@ def plot_budget(root_dir='data/out/raw/tw',
 
         axes[0].tick_params(direction='in', width=1.5)
         axes[0].set_title(f'{names[name]}')
+        axes[1].set_title(f'Threshold: {threshold}')
+        axes[0].legend(loc='lower left')
+        axes[0].set_ylabel('Resulting Polarization, $P(\mathbf{z}\')$')
+        axes[0].set_xlabel('Planner\'s Budget, $k$')
+
+        axes[1].set_xlabel('Planner\'s Budget, $k$')
+        axes[1].set_ylabel('Resulting Disagreement+Polarization')
+
+        axes[1].tick_params(direction='in', width=1.5)
+        axes[1].legend(loc='lower left')
+        
+        plt.savefig('fig/cg'+name+'_pol.pdf')
+
+def plot_common_ground(names,
+                       file_path, 
+                       file_path2 = None, 
+                       log=False, 
+                       innate=False,
+                       linestyles = ['-', '--', '-.', ':']):
+                       
+    for name in names.keys():
+        print('\n################\n'+name)
+        data = pd.read_csv(file_path, index_col = 0)
+        if file_path2 is not None:
+            data2 = pd.read_csv(file_path2, index_col = 0)
+
+        df = process_df_cols(data, ['pol1_vec', 'pol2_vec', 'pol_dis_vec', 's'])
+        df2 = process_df_cols(data2, ['pol_vec', 'pol_dis_vec', 's'])
+
+
+        # f,ax = plt.subplots(figsize = (8,6))
+        f, axes = plt.subplots(1, 2, figsize=(16, 6), sharey=False)
+        
+        if log:
+            # plt.yscale('log')
+            axes[0].set_yscale('log')
+            axes[1].set_yscale('log')
+            
+        for i in range(len(df)):
+            # graph business
+            print(df.type.iloc[i], df.pol1_vec.iloc[i][len(df.pol1_vec.iloc[i])-1])
+            axes[0].plot(df.pol1_vec.iloc[i], linestyle = linestyles[i],
+                    label = legend[df.type.iloc[i]], linewidth = 3)
+            axes[0].plot(df.pol2_vec.iloc[i], linestyle = linestyles[i],
+                    label = 'pol2', linewidth = 3)
+            axes[1].plot(df.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+                    label = 'pol+dis', linewidth = 3)
+
+        for i in range(len(df2)):
+            # graph business
+            print(df2.type.iloc[i], df2.pol_vec.iloc[i][len(df2.pol_vec.iloc[i])-1])
+            # plt.plot(pol_dis_K_n[i], linestyle = linestyles[i],
+            #     label = legend[df.type.iloc[i]], linewidth = 3)
+            # Previous plotting
+            axes[0].plot(df2.pol_vec.iloc[i], linestyle = linestyles[i],
+                    label = legend[df2.type.iloc[i]], linewidth = 3)
+            axes[1].plot(df2.pol_dis_vec.iloc[i], linestyle = linestyles[i],
+                    label = legend[df2.type.iloc[i]], linewidth = 3)
+
+        axes[0].tick_params(direction='in', width=1.5)
+        axes[0].set_title(f'{names[name]}')
         axes[0].legend(loc='lower left')
         axes[0].set_ylabel('Resulting Polarization, $P(\mathbf{z}\')$')
         axes[0].set_xlabel('Planner\'s Budget, $k$')
@@ -174,16 +236,29 @@ def plot_budget(root_dir='data/out/raw/tw',
 
         axes[1].tick_params(direction='in', width=1.5)
         axes[1].legend(loc='lower left')
+    #    plt.ylabel(r'Fraction of Remaining Polarization, $\frac{P(\mathbf{z}\')}{P(\mathbf{z})}$')
+        plt.title('Performance of Common Ground Maximizing Heuristics',
+                position = (0.5,0.9))
         
-        plt.savefig('fig/min'+name+'_pol.pdf')
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        current_time = datetime.now().strftime('%H-%M-%S')
+
+        os.makedirs(f'fig/cg/{current_date}/', exist_ok=True)
+
+        plt.savefig(f'fig/cg/{current_date}/{current_time}_{name}.pdf')
+
 
 if __name__ == "__main__":
     names = {'rd': 'Reddit'} # for testing
     # graph_node_distance(NAMES, LEGEND, LINESTYLES)
-    names_tw = {'tw_rand': 'Twitter and Random Opinion, Varying $\mathbf{n}$'} # for testing
-    names_rd = {'rd_rand': 'Reddit and Random Opinion, Varying $\mathbf{n}$'}
-    legend = {'opt_max_dis': 'DS of G2'}
+    names_tw = {'tw_rel': 'Twitter and Related Opinion, Varying $\mathbf{n}$'} # for testing
+    names_rd = {'rd_rel': 'Reddit and Related Opinion, Varying $\mathbf{n}$'}
     # budget_and_pol(names, legend, LINESTYLES)
-    plot_budget(root_dir='data/out/raw/tw', names=names_tw, linestyles=LINESTYLES)
-    plot_budget(root_dir='data/out/raw/rd', names=names_rd, linestyles=LINESTYLES)
+    # plot_budget(root_dir='data/out/raw/tw/constraint', names=names_tw, linestyles=LINESTYLES)
+    # plot_budget(root_dir='data/out/raw/rd', names=names_rd, linestyles=LINESTYLES)
+
+    # file_path = f'data/out/raw/tw/cg/2024-05-19/tw_rel_6_10-53-07.csv'
+    file_path1 = f'data/out/raw/tw/cg/2024-05-19/tw_rel_6_11-22-33.csv'
+    file_path2 = f'data/out/raw/tw/cg/2024-05-19/all_metrics_tw_rel_6_12-14-50.csv'
+    plot_common_ground(names_tw, file_path1, file_path2)
 

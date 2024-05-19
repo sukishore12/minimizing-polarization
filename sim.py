@@ -1,5 +1,6 @@
 import sys
 import os
+from datetime import datetime
 import numpy as np
 import networkx as nx
 
@@ -15,7 +16,8 @@ n_cores = -1
 funs = ['opt_random_add', 'opt_max_dis', 'opt_max_fiedler_diff',
         'opt_max_grad']
 
-funs = ['opt_max_dis'] # for testing related opinion graph
+funs2 = ['opt_max_cg_consistent']
+
 
 ##### Two Opinions #####
 def twitter_random(n=3, threshold=None):
@@ -31,9 +33,15 @@ def twitter_random(n=3, threshold=None):
                                         s1=s_tw, s2=s_new,
                                         threshold=threshold)
         
-        # df = test_heuristics(funs, G_tw, s=s_tw, parallel = True, n_cores = n_cores)
-        os.makedirs(f'data/out/raw/tw', exist_ok=True)
-        df.to_csv(f'data/out/raw/tw/constraint_{threshold}_tw_rand_{n}.csv')
+        df2 = test_heuristics(funs, G_tw, s=s_tw, parallel = True, n_cores = n_cores)
+        
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        current_time = datetime.now().strftime('%H-%M-%S')
+
+        dir_name = f'data/out/raw/tw/cg/{current_date}'  
+        os.makedirs(dir_name, exist_ok=True)
+        df.to_csv(f'{dir_name}/tw_rel_{n}_{current_time}.csv')
+        df2.to_csv(f'{dir_name}/all_metrics_tw_rel_{n}_{current_time}.csv')
 
 
 ##### Two Opinions #####
@@ -143,10 +151,9 @@ if __name__ == "__main__":
         # reddit_random(4)
         # reddit_random(6)
         # reddit_random(8)
-        threshold = 0.5
-        # twitter_random(2, threshold)
-        twitter_random(4, threshold)
-        twitter_random(6, threshold)
-        twitter_random(8, threshold)
+        # twitter_random(2)
+        # twitter_random(4)
+        twitter_random(6)
+        # twitter_random(8)
 
 

@@ -85,6 +85,30 @@ def opt_max_2grad(G, s1, s2, parallel = False, n_cores = -1):
 
     return (G_new, nonedges.difference(set([new_edge])), new_edge)
 
+def opt_max_common_ground(G1, s1, G2, s2):
+    n = len(G1.nodes())
+    G1_new = G1.copy() 
+    G2_new = G2.copy()  
+
+    x1 = get_expressed(G1, s1)
+    x2 = get_expressed(G2, s2)
+
+    # non-edges in G1
+    nonedges = set(itertools.combinations(range(n),2)).difference(set(G1_new.edges()))
+
+    #Calculates objective function for each pair of nodes: disagreement D_{ij}(x) = (x_i - x_j)^2
+    obj_nonedges1 = [(x1[i] - x1[j])**2 for (i,j) in nonedges]  
+    obj_nonedges2 = [(x2[i] - x2[j])**2 for (i,j) in nonedges]
+
+    # Calculate common ground
+    cg_nonedges = [a - b for a, b in zip(obj_nonedges1, obj_nonedges2)]
+
+    # Choose edge with highest common ground         
+    new_edge = list(nonedges)[cg_nonedges.index(max(cg_nonedges))]
+    G1_new.add_edges_from([new_edge])
+    G2_new.add_edges_from([new_edge])
+
+    return (G2_new, nonedges.difference(set([new_edge])), new_edge)
 
 ########################### Network Optimization ###########################
 def test_heuristics_two_graphs(G1, G2, s1, s2, 
@@ -105,8 +129,8 @@ def test_heuristics_two_graphs(G1, G2, s1, s2,
     """ 
 
     if k is None:
-        k = int(0.1*len(G1.edges())) # Default to 10% of num. edges
-        # k = int(0.5*len(G1.nodes()))
+        # k = int(0.1*len(G1.edges())) # Default to 10% of num. edges
+        k = int(0.5*len(G1.nodes()))
         print(f'G1 current num edges: {len(G1.edges())}')
         print(f'Planner budget: {k}')
     
@@ -120,10 +144,14 @@ def test_heuristics_two_graphs(G1, G2, s1, s2,
     G1_new = G1.copy()
     G2_new = G2.copy()
 
-    pol_tmp = np.zeros(k+1)
-    pol_tmp[0] = get_measure(G1,s1,'pol')
+    pol1_tmp = np.zeros(k+1)
+    pol1_tmp[0] = get_measure(G1,s1,'pol')
     pol_dis_tmp = np.zeros(k+1)
     pol_dis_tmp[0] = get_measure(G1,s1,'pol_dis')
+
+    pol2_tmp = np.zeros(k+1)
+    pol2_tmp[0] = get_measure(G2, s2, 'pol')
+
     homophily_tmp = np.zeros(k+1)
     homophily_tmp[0] = get_measure(G1,s1,'homophily')
     s_gap_tmp = np.zeros(k+1)
@@ -136,16 +164,17 @@ def test_heuristics_two_graphs(G1, G2, s1, s2,
     nonedges = None
 
     for i in range(k):
-        (G2_new, nonedges, new_edge) = opt_min_dis(G1_new, s1, 
-                                                  G2_new, s2,
-                                                  constraint='g2_max_dis',
-                                                  threshold=threshold)
+        (G2_new, nonedges, new_edge) = opt_max_common_ground(G1_new, 
+                                                             s1, 
+                                                             G2_new, 
+                                                             s2)
         G1_new.add_edge(*new_edge)
 
-        pol_tmp[i+1] = get_measure(G1_new, s1, 'pol')
+        pol1_tmp[i+1] = get_measure(G1_new, s1, 'pol')
+        pol2_tmp[i+1] = get_measure(G2_new, s2, 'pol')
+
         # Added
         pol_dis_tmp[i+1] = get_measure(G1_new, s1, 'pol_dis')
-
         homophily_tmp[i+1] = get_measure(G1_new, s1,'homophily')
         s_gap_tmp[i+1] = get_measure(G1_new, s1,'spectral_gap')
         
@@ -158,10 +187,10 @@ def test_heuristics_two_graphs(G1, G2, s1, s2,
     end = time.time()
     elapsed = np.round(end - start, 4)
 
-    df_tmp = pd.DataFrame({'type': 'opt_max_dis', 
+    df_tmp = pd.DataFrame({'type': 'common_ground', 
                            'constraint': constraint, 
-                           'threshold': threshold,
-                           'pol_vec': None, 
+                           'pol1_vec': None, 
+                           'pol2_vec': None, 
                            'pol_dis_vec': None,
                            'homophily_vec': None, 
                            's_gap_vec': None, 
@@ -172,8 +201,8 @@ def test_heuristics_two_graphs(G1, G2, s1, s2,
                            index = [0], 
                            dtype = 'object')
     
-    df_tmp.at[0,'threshold'] = threshold # added for opt_min_dis
-    df_tmp.at[0,'pol_vec'] = pol_tmp.tolist()
+    df_tmp.at[0,'pol1_vec'] = pol1_tmp.tolist()
+    df_tmp.at[0,'pol2_vec'] = pol2_tmp.tolist()
     df_tmp.at[0,'pol_dis_vec'] = pol_dis_tmp.tolist()
     df_tmp.at[0,'homophily_vec'] = homophily_tmp.tolist()
     df_tmp.at[0,'s_gap_vec'] = s_gap_tmp.tolist()
