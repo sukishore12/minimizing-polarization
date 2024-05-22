@@ -16,7 +16,7 @@ n_cores = -1
 funs = ['opt_random_add', 'opt_max_dis', 'opt_max_fiedler_diff',
         'opt_max_grad']
 
-funs2 = ['opt_max_cg_consistent']
+funs2 = ['opt_max_common_ground', 'opt_max_2grad']
 
 
 ##### Two Opinions #####
@@ -29,7 +29,7 @@ def twitter_random(n=3, threshold=None):
         G_new = G_tw.copy()
         s_new = related_opinion_graph(s_tw, n * 0.1)
 
-        df = test_heuristics_two_graphs(G_tw, G2=G_new, 
+        df = test_heuristics_two_graphs(funs2, G_tw, G2=G_new, 
                                         s1=s_tw, s2=s_new,
                                         threshold=threshold)
         

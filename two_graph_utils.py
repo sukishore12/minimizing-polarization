@@ -47,7 +47,7 @@ def get_grad(grad_pt, i, j):
     return grad_pt[i,i] + grad_pt[j,j] - 2*grad_pt[i,j]
 
 
-def opt_max_2grad(G, s1, s2, parallel = False, n_cores = -1):
+def opt_max_2grad(G1, s1, G2, s2, parallel = False, n_cores = -1):
     """
     Goal: Optimization procedure that maximizes the derivative of polarization of s1 and minimizes the derivative of polarization of s2
     
@@ -61,29 +61,31 @@ def opt_max_2grad(G, s1, s2, parallel = False, n_cores = -1):
         new_edge (tuple): new edge added
     """
 
-    n = len(G.nodes())
-    G_new = G.copy()  
-    d = G.degree()
-    x1 = get_expressed(G,s1)
+    n = len(G1.nodes())
+    G1_new = G1.copy()  
+    G2_new = G2.copy()  
+    x1 = get_expressed(G1,s1)
     x_tilde1 = x1 - x1.mean()
 
-    x2 = get_expressed(G,s2)
+    x2 = get_expressed(G2,s2)
     x_tilde2 = x2 - x2.mean()
 
-    nonedges = set(itertools.combinations(range(n),2)).difference(set(G_new.edges()))
+    nonedges = set(itertools.combinations(range(n),2)).difference(set(G1_new.edges()))
 
     # Precomputed for speed
     I_n = np.identity(n)
-    grad_pt1 = 2*np.outer(x_tilde1, x_tilde1) @ np.linalg.inv(I_n+ nx.laplacian_matrix(G).todense())
-    grad_pt2 = 2*np.outer(x_tilde2, x_tilde2) @ np.linalg.inv(I_n+ nx.laplacian_matrix(G).todense())
+    grad_pt1 = 2*np.outer(x_tilde1, x_tilde1) @ np.linalg.inv(I_n+ nx.laplacian_matrix(G1).todense())
+    grad_pt2 = 2*np.outer(x_tilde2, x_tilde2) @ np.linalg.inv(I_n+ nx.laplacian_matrix(G2).todense())
 
     # Optimizing over gradient of s1 polarization - gradient of s2 polarization
     obj_nonedges = [(get_grad(grad_pt1, i, j) - get_grad(grad_pt2, i, j))for (i,j) in nonedges]
    
     new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
-    G_new.add_edges_from([new_edge])
+    G1_new.add_edges_from([new_edge])
+    G2_new.add_edges_from([new_edge])
 
-    return (G_new, nonedges.difference(set([new_edge])), new_edge)
+    return (G2_new, nonedges.difference(set([new_edge])), new_edge)
+
 
 def opt_max_common_ground(G1, s1, G2, s2):
     n = len(G1.nodes())
@@ -111,7 +113,7 @@ def opt_max_common_ground(G1, s1, G2, s2):
     return (G2_new, nonedges.difference(set([new_edge])), new_edge)
 
 ########################### Network Optimization ###########################
-def test_heuristics_two_graphs(G1, G2, s1, s2, 
+def test_heuristics_two_graphs(funs, G1, G2, s1, s2, 
                                k = None, 
                                constraint = None,
                                threshold = None):
@@ -139,80 +141,80 @@ def test_heuristics_two_graphs(G1, G2, s1, s2,
                                  'G_in', 's', 'G_out', 'elapsed'], 
                                  dtype = 'object')
     
-    start = time.time()
+    for fn_name in funs:
+        sys.stdout.write("\n-----------------------------------\n"+ fn_name+"\n-----------------------------------\n")
+        sys.stdout.flush()
+        start = time.time()
 
-    G1_new = G1.copy()
-    G2_new = G2.copy()
+        G1_new = G1.copy()
+        G2_new = G2.copy()
 
-    pol1_tmp = np.zeros(k+1)
-    pol1_tmp[0] = get_measure(G1,s1,'pol')
-    pol_dis_tmp = np.zeros(k+1)
-    pol_dis_tmp[0] = get_measure(G1,s1,'pol_dis')
+        pol1_tmp = np.zeros(k+1)
+        pol1_tmp[0] = get_measure(G1,s1,'pol')
+        pol_dis_tmp = np.zeros(k+1)
+        pol_dis_tmp[0] = get_measure(G1,s1,'pol_dis')
 
-    pol2_tmp = np.zeros(k+1)
-    pol2_tmp[0] = get_measure(G2, s2, 'pol')
+        pol2_tmp = np.zeros(k+1)
+        pol2_tmp[0] = get_measure(G2, s2, 'pol')
 
-    homophily_tmp = np.zeros(k+1)
-    homophily_tmp[0] = get_measure(G1,s1,'homophily')
-    s_gap_tmp = np.zeros(k+1)
-    s_gap_tmp[0] = get_measure(G1,s1,'spectral_gap')
+        homophily_tmp = np.zeros(k+1)
+        homophily_tmp[0] = get_measure(G1,s1,'homophily')
+        s_gap_tmp = np.zeros(k+1)
+        s_gap_tmp[0] = get_measure(G1,s1,'spectral_gap')
 
-    sys.stdout.write("Progress: 0% Complete\n")
-    sys.stdout.flush()
-    prog = 10
+        sys.stdout.write("Progress: 0% Complete\n")
+        sys.stdout.flush()
+        prog = 10
 
-    nonedges = None
+        nonedges = None
 
-    for i in range(k):
-        (G2_new, nonedges, new_edge) = opt_max_common_ground(G1_new, 
-                                                             s1, 
-                                                             G2_new, 
-                                                             s2)
-        G1_new.add_edge(*new_edge)
+        for i in range(k):
+            (G_new, nonedges, new_edge) = eval(fn_name+'(G1_new, s1, G2_new, s2)')
+            G1_new.add_edge(*new_edge)
 
-        pol1_tmp[i+1] = get_measure(G1_new, s1, 'pol')
-        pol2_tmp[i+1] = get_measure(G2_new, s2, 'pol')
+            pol1_tmp[i+1] = get_measure(G1_new, s1, 'pol')
+            pol2_tmp[i+1] = get_measure(G2_new, s2, 'pol')
 
-        # Added
-        pol_dis_tmp[i+1] = get_measure(G1_new, s1, 'pol_dis')
-        homophily_tmp[i+1] = get_measure(G1_new, s1,'homophily')
-        s_gap_tmp[i+1] = get_measure(G1_new, s1,'spectral_gap')
+            # Added
+            pol_dis_tmp[i+1] = get_measure(G1_new, s1, 'pol_dis')
+            homophily_tmp[i+1] = get_measure(G1_new, s1,'homophily')
+            s_gap_tmp[i+1] = get_measure(G1_new, s1,'spectral_gap')
+            
+            if (i+1)*100/k >= prog:
+                sys.stdout.write("Progress: " +str(prog) + "% Complete\n")
+                sys.stdout.flush()
+                prog = prog + 10
+            
+            
+        end = time.time()
+        elapsed = np.round(end - start, 4)
+
+        df_tmp = pd.DataFrame({'type': 'common_ground', 
+                            'constraint': constraint, 
+                            'pol1_vec': None, 
+                            'pol2_vec': None, 
+                            'pol_dis_vec': None,
+                            'homophily_vec': None, 
+                            's_gap_vec': None, 
+                            'G_in': None, 
+                            's': None,
+                            'G_out': None, 
+                            'elapsed': elapsed},
+                            index = [0], 
+                            dtype = 'object')
         
-        if (i+1)*100/k >= prog:
-            sys.stdout.write("Progress: " +str(prog) + "% Complete\n")
-            sys.stdout.flush()
-            prog = prog + 10
-        
-        
-    end = time.time()
-    elapsed = np.round(end - start, 4)
+        df_tmp.at[0,'pol1_vec'] = pol1_tmp.tolist()
+        df_tmp.at[0,'pol2_vec'] = pol2_tmp.tolist()
+        df_tmp.at[0,'pol_dis_vec'] = pol_dis_tmp.tolist()
+        df_tmp.at[0,'homophily_vec'] = homophily_tmp.tolist()
+        df_tmp.at[0,'s_gap_vec'] = s_gap_tmp.tolist()
+        df_tmp.at[0,'G_in'] = nx.adjacency_matrix(G1).todense().tolist()
+        df_tmp.at[0,'s'] = np.transpose(s1)[0,:].tolist()
+        df_tmp.at[0,'G_out'] = nx.adjacency_matrix(G1_new).todense().tolist()
 
-    df_tmp = pd.DataFrame({'type': 'common_ground', 
-                           'constraint': constraint, 
-                           'pol1_vec': None, 
-                           'pol2_vec': None, 
-                           'pol_dis_vec': None,
-                           'homophily_vec': None, 
-                           's_gap_vec': None, 
-                           'G_in': None, 
-                           's': None,
-                           'G_out': None, 
-                           'elapsed': elapsed},
-                           index = [0], 
-                           dtype = 'object')
-    
-    df_tmp.at[0,'pol1_vec'] = pol1_tmp.tolist()
-    df_tmp.at[0,'pol2_vec'] = pol2_tmp.tolist()
-    df_tmp.at[0,'pol_dis_vec'] = pol_dis_tmp.tolist()
-    df_tmp.at[0,'homophily_vec'] = homophily_tmp.tolist()
-    df_tmp.at[0,'s_gap_vec'] = s_gap_tmp.tolist()
-    df_tmp.at[0,'G_in'] = nx.adjacency_matrix(G1).todense().tolist()
-    df_tmp.at[0,'s'] = np.transpose(s1)[0,:].tolist()
-    df_tmp.at[0,'G_out'] = nx.adjacency_matrix(G1_new).todense().tolist()
+        df = pd.concat([df, df_tmp], ignore_index = True)
 
-    df = pd.concat([df, df_tmp], ignore_index = True)
-
-    sys.stdout.write(f"Done. Elapsed Time: {time.strftime('%H:%M:%S', time.gmtime(elapsed))}\n")
-    sys.stdout.flush()
+        sys.stdout.write(f"Done. Elapsed Time: {time.strftime('%H:%M:%S', time.gmtime(elapsed))}\n")
+        sys.stdout.flush()
 
     return df
