@@ -47,24 +47,20 @@ def reddit_random(n=1, threshold=None):
         sys.stdout.write('----------------------- Reddit and Random -----------------------\n')
         sys.stdout.flush()
 
-        (n_tw, s_tw, A_tw, G_tw, L_tw) = load_reddit()
-        G_new = G_tw.copy()
-        s_new = related_opinion_graph(s_tw, 1)
-        # s_new = random_opinion_graph(s_tw)
+        (n_rd, s_rd, A_rd, G_rd, L_rd) = load_reddit()
+        G_new = G_rd.copy()
+        s_new = related_opinion_graph(s_rd, n)
 
-        df = test_heuristics_two_graphs(funs2, G_tw, G2=G_new, 
-                                        s1=s_tw, s2=s_new,
+        df = test_heuristics_two_graphs(FUNS, G_rd, G2=G_new, 
+                                        s1=s_rd, s2=s_new,
                                         threshold=threshold)
-        
-        df2 = test_heuristics(funs, G_tw, s=s_tw, parallel = True, n_cores = n_cores)
         
         current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H-%M-%S')
 
-        dir_name = f'data/out/raw/rd/cg/{current_date}'  
+        dir_name = f'data/out/raw/rd/{current_date}'  
         os.makedirs(dir_name, exist_ok=True)
-        df.to_csv(f'{dir_name}/rd_rel_{n}_{current_time}.csv')
-        df2.to_csv(f'{dir_name}/all_metrics_rd_rel_{n}_{current_time}.csv')
+        df.to_csv(f'{dir_name}/rd_{n}_{current_time}.csv')
 
 
 def blogs_random(n=1, threshold=None):

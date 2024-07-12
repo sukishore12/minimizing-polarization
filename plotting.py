@@ -30,12 +30,14 @@ NAMES = {'rd': 'Reddit', 'tw': 'Twitter', 'bg': 'Political Blogs',
 plt.rcParams.update({'font.size': 15, 'axes.linewidth': 1.5 })
 
 def plot_common_ground(names,
-                       file_path, 
+                       file_paths, 
                        pol_weights=[0.7, 0.3],
                        log=False):
                        
-    for name in names.keys():
+    for idx, name in enumerate(names.keys()):
         print('\n################\n'+name)
+        print(f'{idx}: {file_paths}')
+        file_path = file_paths[idx]
         data = pd.read_csv(file_path, index_col = 0)
         df = process_df_cols(data, ['pol1_vec', 'pol2_vec'])
 
@@ -60,7 +62,7 @@ def plot_common_ground(names,
 
         axes[0].tick_params(direction='in', width=1.5)
         axes[0].set_title(f'{names[name]}')
-        axes[0].legend(loc='lower left')
+        # axes[0].legend()
         axes[0].set_ylabel('Polarization, $P(\mathbf{z}\')$')
         axes[0].set_xlabel('Planner\'s Budget, $k$')
 
@@ -68,7 +70,8 @@ def plot_common_ground(names,
         axes[1].set_ylabel('Weighted Polarization, $0.7P(\mathbf{z_1}) + 0.3P(\mathbf{z_1})$')
 
         axes[1].tick_params(direction='in', width=1.5)
-        axes[1].legend(loc='lower left')
+        axes[1].legend(loc='upper right', bbox_to_anchor=(1.35, 1))
+        plt.tight_layout()
         plt.title('Performance of Common Ground Maximizing Heuristics',
                 position = (0.5,0.9))
         
@@ -80,7 +83,7 @@ def plot_common_ground(names,
 
 
 if __name__ == "__main__":
-    names_tw = {'tw_rel': 'Twitter and Related Opinion'} # for testing
-    file_path = f'data/out/raw/tw/2024-07-09/tw_1_16-51-56.csv'
-    plot_common_ground(names_tw, file_path)
+    names = {'rd': 'Reddit Graph', 'er': f"Erdos-Renyi Graph, n = 1000, p = 0.02"} # for testing
+    file_paths = [f'data/out/raw/er/2024-07-11/er_1_18-13-56.csv', 'data/out/raw/rd/2024-07-11/rd_1_18-50-13.csv']
+    plot_common_ground(names, file_paths)
 
