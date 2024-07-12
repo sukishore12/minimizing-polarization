@@ -67,28 +67,24 @@ def reddit_random(n=1, threshold=None):
         df2.to_csv(f'{dir_name}/all_metrics_rd_rel_{n}_{current_time}.csv')
 
 
-def blogs_random(n=3, threshold=None):
+def blogs_random(n=1, threshold=None):
         sys.stdout.write('----------------------- Blogs and Random -----------------------\n')
         sys.stdout.flush()
 
         (n_tw, s_tw, A_tw, G_tw, L_tw) = load_blogs()
         G_new = G_tw.copy()
-        s_new = related_opinion_graph(s_tw, n * 0.1)
-        # s_new = random_opinion_graph(s_tw)
+        s_new = related_opinion_graph(s_tw, n)
 
-        df = test_heuristics_two_graphs(funs2, G_tw, G2=G_new, 
+        df = test_heuristics_two_graphs(FUNS, G_tw, G2=G_new, 
                                         s1=s_tw, s2=s_new,
                                         threshold=threshold)
-        
-        df2 = test_heuristics(funs, G_tw, s=s_tw, parallel = True, n_cores = n_cores)
         
         current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H-%M-%S')
 
-        dir_name = f'data/out/raw/bl/cg/{current_date}'  
+        dir_name = f'data/out/raw/bl/{current_date}'  
         os.makedirs(dir_name, exist_ok=True)
         df.to_csv(f'{dir_name}/bl_rel_{n}_{current_time}.csv')
-        df2.to_csv(f'{dir_name}/all_metrics_bl_rel_{n}_{current_time}.csv')
 
 
 def er_random(n=1, threshold=None):
@@ -115,7 +111,7 @@ def er_random(n=1, threshold=None):
         df.to_csv(f'{dir_name}/er_{n}_{current_time}.csv')
 
 
-def sbm_random(n=3, threshold=None):
+def sbm_random(n=1, threshold=None):
         sys.stdout.write('----------------------- Blogs and Random -----------------------\n')
         sys.stdout.flush()
 
@@ -127,23 +123,46 @@ def sbm_random(n=3, threshold=None):
 
         np.random.seed(0)
         (c1, c2, G_sbm, s_sbm) = make_block(n, p1, p2, a, b, weighted = False)
+        G_new = G_sbm.copy()
+        s_new = related_opinion_graph(s_sbm, n)
 
-        np.random.seed(42)
-        (c1, c2, G_new, s_new) = make_block(n, p1, p2, a, b, weighted = False)
-
-        df = test_heuristics_two_graphs(funs2, G_sbm, G2=G_new, 
+        df = test_heuristics_two_graphs(FUNS, G_sbm, G2=G_new, 
                                         s1=s_sbm, s2=s_new,
                                         threshold=threshold)
         
-        df2 = test_heuristics(funs, G_sbm, s=s_sbm, parallel = True, n_cores = n_cores)
         
         current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H-%M-%S')
 
-        dir_name = f'data/out/raw/sbm/cg/{current_date}'  
+        dir_name = f'data/out/raw/sbm/{current_date}'  
         os.makedirs(dir_name, exist_ok=True)
         df.to_csv(f'{dir_name}/sbm_rel_{n}_{current_time}.csv')
-        df2.to_csv(f'{dir_name}/all_metrics_sbm_rel_{n}_{current_time}.csv')
+
+def pa_random(n=1, threshold=None):
+        sys.stdout.write('----------------------- Preferential Attachment -----------------------\n')
+        sys.stdout.flush()
+
+        n = 1000
+        n0 = 2
+        d0 = 1
+        m = 5
+
+        np.random.seed(0)
+        (G_0, _) = make_erdos_renyi(n0, d0, weighted = False)
+        (G_pa, s_pa) = make_pref_attach(n, G_0, m = m, weighted = False)
+        G_new = G_pa.copy()
+        s_new = related_opinion_graph(s_pa, n)
+
+        df = test_heuristics_two_graphs(FUNS, G_pa, G2=G_new, 
+                                        s1=s_pa, s2=s_new,
+                                        threshold=threshold)
+
+        current_date = datetime.now().strftime('%Y-%m-%d')
+        current_time = datetime.now().strftime('%H-%M-%S')
+
+        dir_name = f'data/out/raw/pa/{current_date}'  
+        os.makedirs(dir_name, exist_ok=True)
+        df.to_csv(f'{dir_name}/pa_rel_{n}_{current_time}.csv')
 
 #'''
 ##### Reddit Network #####
@@ -230,5 +249,6 @@ def pref_attach():
 
 if __name__ == "__main__":
         # twitter_random(1)
-        er_random()
+        # er_random()
+        blogs_random()
 
