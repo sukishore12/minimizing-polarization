@@ -265,3 +265,77 @@ def test_heuristics_two_graphs(funs, G1, G2, s1, s2,
         sys.stdout.flush()
 
     return df
+
+def test_heuristics_set_k(funs, G1, G2, s1, s2, 
+                            k = None, 
+                            constraint = None):
+    """
+    Measure heuristics for expressed polarization, spectral gap, 
+    assortativity of innate opinions.
+
+    Inputs:
+        funs (List[str]): list of functions to optimize over 
+                        ex: ['opt_random_add', 'opt_max_dis']
+        G1 (nx.Graph): input graph of opinions 1 (politics), graph trying to 
+                        reduce polarization on
+        G2 (nx.Graph): input graph of opinions 2 (sports), secondary opinions graph
+        k (int): planner's budget, default: half of number of nodes
+    """ 
+
+    k = int(0.5*len(G1.nodes()))
+    print(f'G1 current num edges: {len(G1.edges())}')
+    print(f'Planner budget: {k}')
+    
+    df = pd.DataFrame(columns = ['type', 'constraint', 
+                                 'pol1_vec', 'pol2_vec', 'elapsed'], 
+                                 dtype = 'object')
+    
+    for fn_name in funs:
+        sys.stdout.write("\n-----------------------------------\n"+ fn_name+"\n-----------------------------------\n")
+        sys.stdout.flush()
+        start = time.time()
+
+        G1_new = G1.copy()
+        G2_new = G2.copy()
+
+        LEN_DATA_POINTS = 2
+        pol1_tmp = np.zeros(LEN_DATA_POINTS)
+        pol1_tmp[0] = get_measure(G1,s1,'pol')
+
+        pol2_tmp = np.zeros(LEN_DATA_POINTS)
+        pol2_tmp[0] = get_measure(G2, s2, 'pol')
+
+        sys.stdout.write("Progress: 0% Complete\n")
+        sys.stdout.flush()
+        prog = 10
+
+        for i in range(k):
+            (G_new, nonedges, new_edge) = eval(fn_name+'(G1_new, s1, G2_new, s2)')
+            G1_new.add_edge(*new_edge)
+            
+            if (i+1)*100/k >= prog:
+                sys.stdout.write("Progress: " +str(prog) + "% Complete\n")
+                sys.stdout.flush()
+                prog = prog + 10
+            
+        pol1_tmp[-1] = get_measure(G1_new, s1, 'pol')
+        pol2_tmp[-1] = get_measure(G2_new, s2, 'pol')         
+        end = time.time()
+        elapsed = np.round(end - start, 4)
+
+        df_tmp = pd.DataFrame({'type': fn_name, 
+                            'constraint': constraint, 
+                            'pol1_vec': None, 
+                            'pol2_vec': None, 
+                            'elapsed': elapsed},
+                            index = [0], 
+                            dtype = 'object')
+        
+        df_tmp.at[0,'pol1_vec'] = pol1_tmp.tolist()
+        df_tmp.at[0,'pol2_vec'] = pol2_tmp.tolist()
+        df = pd.concat([df, df_tmp], ignore_index = True)
+
+        sys.stdout.write(f"Done. Elapsed Time: {time.strftime('%H:%M:%S', time.gmtime(elapsed))}\n")
+        sys.stdout.flush()
+
+    return df
