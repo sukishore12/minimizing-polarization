@@ -298,11 +298,10 @@ def test_heuristics_set_k(funs, G1, G2, s1, s2,
         G1_new = G1.copy()
         G2_new = G2.copy()
 
-        LEN_DATA_POINTS = 2
-        pol1_tmp = np.zeros(LEN_DATA_POINTS)
+        pol1_tmp = np.zeros(k+1)
         pol1_tmp[0] = get_measure(G1,s1,'pol')
 
-        pol2_tmp = np.zeros(LEN_DATA_POINTS)
+        pol2_tmp = np.zeros(k+1)
         pol2_tmp[0] = get_measure(G2, s2, 'pol')
 
         sys.stdout.write("Progress: 0% Complete\n")
@@ -318,8 +317,9 @@ def test_heuristics_set_k(funs, G1, G2, s1, s2,
                 sys.stdout.flush()
                 prog = prog + 10
             
-        pol1_tmp[-1] = get_measure(G1_new, s1, 'pol')
-        pol2_tmp[-1] = get_measure(G2_new, s2, 'pol')         
+            pol1_tmp[i+1] = get_measure(G1_new, s1, 'pol')
+            pol2_tmp[i+1] = get_measure(G2_new, s2, 'pol')
+                   
         end = time.time()
         elapsed = np.round(end - start, 4)
 

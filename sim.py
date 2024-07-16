@@ -1,3 +1,4 @@
+import argparse
 import sys
 import os
 from datetime import datetime
@@ -18,7 +19,7 @@ n_cores = -1
 
 FUNS = ['opt_random_add', 'opt_max_fiedler_diff', 
         'opt_max_common_ground', 'opt_max_2grad']
-RELATED_VALS = [0, 0.2, 0.4, 0.6, 0.8, 1]
+RELATED_VALS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 
 ##### Two Opinions #####
 def twitter_random(n=1, threshold=None):
@@ -62,29 +63,33 @@ def reddit_random(n=1, threshold=None):
         os.makedirs(dir_name, exist_ok=True)
         df.to_csv(f'{dir_name}/rd_{n}_{current_time}.csv')
 
-def test_relatedness_reddit(related_vals:list):
+def test_relatedness_reddit(dir_name:str = f'data/out/raw/rd/related/', 
+                            related_vals:list = RELATED_VALS,
+                            k = None):
         sys.stdout.write('----------------------- Reddit and Vary Relatedness -----------------------\n')
         sys.stdout.flush()
 
         (n_rd, s_rd, A_rd, G_rd, L_rd) = load_reddit()
-        k = int(0.5*len(G_rd.nodes()))
+        if k is None:
+                k = int(0.5*len(G_rd.nodes()))
         print(f'Graph current num edges: {len(G_rd.edges())}')
         print(f'Planner budget: {k}')
         G_new = G_rd.copy()
 
         current_date = datetime.now().strftime('%Y-%m-%d')
-        dir_name = f'data/out/raw/rd/related3/' 
+        current_time = datetime.now().strftime('%H-%M-%S')
         os.makedirs(dir_name, exist_ok=True)
 
         for val in related_vals:
                 print(f'==== Related: {val} ====')
                 s_new = related_opinion_graph(s_rd, val)
 
-                df = test_heuristics_set_k(FUNS, G_rd, G2=G_new, 
-                                                s1=s_rd, s2=s_new,
-                                                k=k)
-
-                current_time = datetime.now().strftime('%H-%M-%S')
+                df = test_heuristics_set_k(FUNS, 
+                                           G_rd, 
+                                           G2=G_new, 
+                                           s1=s_rd, 
+                                           s2=s_new,
+                                           k=k)
 
                 df.to_csv(f'{dir_name}/rd_r{val}_k{k}_{current_date}_{current_time}.csv')     
 
@@ -270,8 +275,13 @@ def pref_attach():
 
 
 if __name__ == "__main__":
+        parser = argparse.ArgumentParser(description='Run simulations')
+        parser.add_argument('--save_dir', required=True, type=str, help='Directory to save csv outputs')
+        parser.add_argument('--k', required=False, type=int, help='Planner\'s budget')
+
         # twitter_random(1)
         # er_random()
         # blogs_random()
-        test_relatedness_reddit(RELATED_VALS)
+        args = parser.parse_args()
+        test_relatedness_reddit(dir_name=args.save_dir, k=args.k)
 
