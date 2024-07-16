@@ -6,6 +6,7 @@ import itertools
 import seaborn as sns
 import os
 from datetime import datetime
+import re
 
 from utils import *
 
@@ -15,8 +16,8 @@ CUSTOM_PALETTE = [ "greyish", "amber", "windows blue",
 sns.set_palette(sns.xkcd_palette(CUSTOM_PALETTE))
 CURRENT_PALETTE = sns.color_palette()
 # sns.palplot(CURRENT_PALETTE) # show the color pallete
-LINESTYLES = ['-', '--', '-.', ':']
-RELATED_VALS = [0.2, 0.8, 1]
+LINESTYLES = ['-', '--', '-.', ':', '']
+RELATED_VALS = [0.2, 0.4, 0.6, 0.8, 1.0]
 
 '''
 Setup
@@ -83,22 +84,33 @@ def plot_common_ground(names,
         plt.savefig(f'fig/{current_date}/{current_time}_{name}.pdf')
 
 def plot_set_k(relatedness,file_paths,
+               graph_type = 'rd',
                k = 1, 
                pol_weights=[0.7, 0.3],
                log=False):
-    files = os.listdir(file_paths)                   
+    files = os.listdir(file_paths)      
+    all_vals = {}             
     for idx, file in enumerate(files):
         file = os.path.join(file_dir, file)
-        parts = file.split('rd_')
+        parts = file.split(graph_type + '_')
 
-        # Further split the resulting part to isolate the number
+        # parts: ['data/out/raw/rd/related2/', '0.8_k5_2024-07-15_10-36-58.csv']
+
+        # Further split the resulting part to isolate the relatedness value
         related_val = parts[1].split('_')[0]
-        print(f'Relatedness: {related_val}')
+        if len(parts) > 1:
+            filename_part = parts[1]
+            r_match = re.search(r'r(\d+\.\d+)_', filename_part)
+            if r_match:
+                related_val = r_match.group(1)
+                print(f'Extracted relatedness: {related_val}')
+            k_match = re.search(r'_k(\d+)_', filename_part)
+            if k_match:
+                k = k_match.group(1)
+                print(f'Extracted k: {k}')
 
         data = pd.read_csv(file, index_col = 0)
         df = process_df_cols(data, ['pol1_vec', 'pol2_vec'])
-        print(len(df))
-        print(df.pol1_vec.iloc[0][-1])
 
         f, axes = plt.subplots(1, 1, figsize=(16, 6), sharey=False)
         
@@ -106,37 +118,51 @@ def plot_set_k(relatedness,file_paths,
             # plt.yscale('log')
             axes.set_yscale('log')
             # axes[1].set_yscale('log')
-            
-        x_values = list(range(len(df.pol1_vec.iloc[0])))  # Example x-axis values
-        print(f'x_values: {x_values}')
-        
+
+        # Creates dictionary to store all values
+        # key: optimization function
+        # value: dictionary of {relatedness: final polarization}
         for i in range(len(df)):
-            y_values = df.pol1_vec.iloc[i]
-            print(f'(x, y): ({x_values}, {y_values})')
-            axes.plot(x_values, y_values,
-                      linestyle=LINESTYLES[i % len(LINESTYLES)],
-                      label=LEGEND.get(df.type.iloc[i], f'Type {i}'), linewidth=3)
+            opt_func = df.type.iloc[i] # which optimization function
+            if opt_func not in all_vals:
+                all_vals[opt_func] = {}
+            all_vals[opt_func][related_val] = df.pol1_vec.iloc[i][-1]
+
         
-        
-        axes.set_title(f'Polarization vs Relatedness for Planner\'s Budget, {k}')
+        for fun_num, opt_func in enumerate(all_vals.keys()):
+            axes.plot(all_vals[opt_func].keys(), all_vals[opt_func].values(), 
+                      linestyle = LINESTYLES[fun_num],
+                      marker = 'o',
+                      label = LEGEND[opt_func], linewidth = 3)
+            
+        axes.tick_params(direction='in', width=1.5)
+        axes.set_title(f'{NAMES[graph_type]}: Final Polarization vs. Opinion Relatedness for Planner\'s Budget of {k}')
         axes.legend()
         axes.set_ylabel('Polarization, $P(\mathbf{z}\')$')
-        axes.set_xlabel('Planner\'s Budget, $k$')
-        plt.tight_layout()
-        plt.title('Performance of Common Ground Maximizing Heuristics',
-                position = (0.5,0.9))
-        
+        axes.set_xlabel(f'Opinion Relatedness')
+
+
         current_date = datetime.now().strftime('%Y-%m-%d')
         current_time = datetime.now().strftime('%H-%M-%S')
-
         os.makedirs(f'fig/{current_date}/', exist_ok=True)
         plt.savefig(f'fig/{current_date}/{current_time}.pdf')
+        # axes.set_ylabel('Polarization, $P(\mathbf{z}\')$')
+        # axes.set_xlabel('Planner\'s Budget, $k$')
+        # plt.tight_layout()
+        # plt.title(f'Polarization vs Relatedness for Planner\'s Budget, {k}',
+        #         position = (0.5,0.9))
+        
+        # current_date = datetime.now().strftime('%Y-%m-%d')
+        # current_time = datetime.now().strftime('%H-%M-%S')
+
+        # os.makedirs(f'fig/{current_date}/', exist_ok=True)
+        # plt.savefig(f'fig/{current_date}/{current_time}.pdf')
 
 
 if __name__ == "__main__":
     # names = {'rd': 'Reddit Graph', 'er': f"Erdos-Renyi Graph, n = 1000, p = 0.02"} # for testing
     # file_paths = [f'data/out/raw/er/2024-07-11/er_1_18-13-56.csv', 'data/out/raw/rd/2024-07-11/rd_1_18-50-13.csv']
     # plot_common_ground(names, file_paths)
-    file_dir = 'data/out/raw/rd/related2'
+    file_dir = 'data/out/raw/rd/related'
     plot_set_k(RELATED_VALS, file_dir)
 

@@ -281,8 +281,8 @@ def test_heuristics_set_k(funs, G1, G2, s1, s2,
         G2 (nx.Graph): input graph of opinions 2 (sports), secondary opinions graph
         k (int): planner's budget, default: half of number of nodes
     """ 
-
-    k = int(0.5*len(G1.nodes()))
+    if k is None:
+        k = int(0.5*len(G1.nodes()))
     print(f'G1 current num edges: {len(G1.edges())}')
     print(f'Planner budget: {k}')
     

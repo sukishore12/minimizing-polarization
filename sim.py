@@ -73,7 +73,7 @@ def test_relatedness_reddit(related_vals:list):
         G_new = G_rd.copy()
 
         current_date = datetime.now().strftime('%Y-%m-%d')
-        dir_name = f'data/out/raw/rd/related/' 
+        dir_name = f'data/out/raw/rd/related3/' 
         os.makedirs(dir_name, exist_ok=True)
 
         for val in related_vals:
@@ -86,7 +86,7 @@ def test_relatedness_reddit(related_vals:list):
 
                 current_time = datetime.now().strftime('%H-%M-%S')
 
-                df.to_csv(f'{dir_name}/rd_{val}_{current_date}_{current_time}.csv')     
+                df.to_csv(f'{dir_name}/rd_r{val}_k{k}_{current_date}_{current_time}.csv')     
 
 
 def blogs_random(n=1, threshold=None):
