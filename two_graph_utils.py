@@ -311,6 +311,7 @@ def test_heuristics_set_k(funs, G1, G2, s1, s2,
         for i in range(k):
             (G_new, nonedges, new_edge) = eval(fn_name+'(G1_new, s1, G2_new, s2)')
             G1_new.add_edge(*new_edge)
+            G2_new.add_edge(*new_edge)
             
             if (i+1)*100/k >= prog:
                 sys.stdout.write("Progress: " +str(prog) + "% Complete\n")
