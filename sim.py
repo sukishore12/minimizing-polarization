@@ -142,14 +142,14 @@ def sbm_random(n=1, threshold=None):
         sys.stdout.write('----------------------- Blogs and Random -----------------------\n')
         sys.stdout.flush()
 
-        n = 1000
+        num_verts = 1000
         p1 = 0.05
         p2 = 0.005
         a = 5
         b = 1
 
         np.random.seed(0)
-        (c1, c2, G_sbm, s_sbm) = make_block(n, p1, p2, a, b, weighted = False)
+        (c1, c2, G_sbm, s_sbm) = make_block(num_verts, p1, p2, a, b, weighted = False)
         G_new = G_sbm.copy()
         s_new = related_opinion_graph(s_sbm, n)
 
@@ -275,13 +275,14 @@ def pref_attach():
 
 
 if __name__ == "__main__":
-        parser = argparse.ArgumentParser(description='Run simulations')
-        parser.add_argument('--save_dir', required=True, type=str, help='Directory to save csv outputs')
-        parser.add_argument('--k', required=False, type=int, help='Planner\'s budget')
+        # parser = argparse.ArgumentParser(description='Run simulations')
+        # parser.add_argument('--save_dir', required=True, type=str, help='Directory to save csv outputs')
+        # parser.add_argument('--k', required=False, type=int, help='Planner\'s budget')
 
-        # twitter_random(1)
-        # er_random()
-        # blogs_random()
-        args = parser.parse_args()
-        test_relatedness_reddit(dir_name=args.save_dir, k=args.k)
+        # # twitter_random(1)
+        # # er_random()
+        # # blogs_random()
+        # args = parser.parse_args()
+        # test_relatedness_reddit(dir_name=args.save_dir, k=args.k)
+        sbm_random()
 
