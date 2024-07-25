@@ -161,8 +161,7 @@ def opt_max_common_ground(G1, s1, G2, s2):
 ########################### Network Optimization ###########################
 def test_heuristics_two_graphs(funs, G1, G2, s1, s2, 
                                k = None, 
-                               constraint = None,
-                               threshold = None):
+                               constraint = None):
     """
     Measure heuristics for expressed polarization, spectral gap, 
     assortativity of innate opinions.
@@ -281,11 +280,6 @@ def test_heuristics_set_k(funs, G1, G2, s1, s2,
         G2 (nx.Graph): input graph of opinions 2 (sports), secondary opinions graph
         k (int): planner's budget, default: half of number of nodes
     """ 
-    if k is None:
-        k = int(0.5*len(G1.nodes()))
-    print(f'G1 current num edges: {len(G1.edges())}')
-    print(f'Planner budget: {k}')
-    
     df = pd.DataFrame(columns = ['type', 'constraint', 
                                  'pol1_vec', 'pol2_vec', 'elapsed'], 
                                  dtype = 'object')
@@ -298,10 +292,11 @@ def test_heuristics_set_k(funs, G1, G2, s1, s2,
         G1_new = G1.copy()
         G2_new = G2.copy()
 
-        pol1_tmp = np.zeros(k+1)
+        LEN_DATA_POINTS = 2
+        pol1_tmp = np.zeros(LEN_DATA_POINTS)
         pol1_tmp[0] = get_measure(G1,s1,'pol')
 
-        pol2_tmp = np.zeros(k+1)
+        pol2_tmp = np.zeros(LEN_DATA_POINTS)
         pol2_tmp[0] = get_measure(G2, s2, 'pol')
 
         sys.stdout.write("Progress: 0% Complete\n")
@@ -317,9 +312,10 @@ def test_heuristics_set_k(funs, G1, G2, s1, s2,
                 sys.stdout.write("Progress: " +str(prog) + "% Complete\n")
                 sys.stdout.flush()
                 prog = prog + 10
-            
-            pol1_tmp[i+1] = get_measure(G1_new, s1, 'pol')
-            pol2_tmp[i+1] = get_measure(G2_new, s2, 'pol')
+
+        # Save the last data point        
+        pol1_tmp[1] = get_measure(G1_new, s1, 'pol')
+        pol2_tmp[1] = get_measure(G2_new, s2, 'pol')
                    
         end = time.time()
         elapsed = np.round(end - start, 4)
