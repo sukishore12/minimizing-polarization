@@ -113,14 +113,14 @@ def sbm_random(n=1):
         sys.stdout.write('----------------------- Blogs and Random -----------------------\n')
         sys.stdout.flush()
 
-        n = 1000
+        num_verts = 1000
         p1 = 0.05
         p2 = 0.005
         a = 5
         b = 1
 
         np.random.seed(0)
-        (c1, c2, G_sbm, s_sbm) = make_block(n, p1, p2, a, b, weighted = False)
+        (c1, c2, G_sbm, s_sbm) = make_block(num_verts, p1, p2, a, b, weighted = False)
         G_new = G_sbm.copy()
         s_new = related_opinion_graph(s_sbm, n)
 
@@ -357,9 +357,9 @@ def pref_attach():
 
 
 if __name__ == "__main__":
-        parser = argparse.ArgumentParser(description='Run simulations')
-        parser.add_argument('--save_dir', required=False, type=str, help='Directory to save csv outputs')
-        parser.add_argument('--k', required=False, type=int, help='Planner\'s budget')
+        # parser = argparse.ArgumentParser(description='Run simulations')
+        # parser.add_argument('--save_dir', required=False, type=str, help='Directory to save csv outputs')
+        # parser.add_argument('--k', required=False, type=int, help='Planner\'s budget')
 
         args = parser.parse_args()
 
@@ -369,10 +369,11 @@ if __name__ == "__main__":
         test_relatedness_blogs()
 
 
-        # twitter_random(1)
-        # er_random()
-        # blogs_random()
+        # # twitter_random(1)
+        # # er_random()
+        # # blogs_random()
 
-        # Example usuage:
-        # python3 sim.py --save_dir data/out/raw/rd/related17Jul --k 100 
+        # # Example usuage:
+        # # python3 sim.py --save_dir data/out/raw/rd/related17Jul --k 100 
+        sbm_random()
 
