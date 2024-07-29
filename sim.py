@@ -11,8 +11,11 @@ from two_graph_utils import *
 # funs = ['opt_random_add', 'opt_max_dis', 'opt_max_fiedler_diff',
 #         'opt_max_grad']
 
-FUNS = ['opt_random_add', 'opt_max_fiedler_diff', 
-        'opt_max_common_ground', 'opt_max_2grad']
+# FUNS = ['opt_random_add', 'opt_max_fiedler_diff', 
+#         'opt_max_common_ground', 'opt_max_2grad']
+
+FUNS = ['opt_max_dis', 'opt_max_grad', 'opt_max_common_ground', 'opt_max_2grad']
+
 RELATED_VALS = [0.0, 0.2, 0.4, 0.6, 0.8, 1.0]
 
 ##### Two Opinions #####
@@ -361,12 +364,12 @@ if __name__ == "__main__":
         # parser.add_argument('--save_dir', required=False, type=str, help='Directory to save csv outputs')
         # parser.add_argument('--k', required=False, type=int, help='Planner\'s budget')
 
-        args = parser.parse_args()
+        # args = parser.parse_args()
 
         # Test relatedness with defaults
         # test_relatedness_reddit()
-        test_relatedness_twitter()
-        test_relatedness_blogs()
+        # test_relatedness_twitter()
+        # test_relatedness_blogs()
 
 
         # # twitter_random(1)
@@ -375,5 +378,6 @@ if __name__ == "__main__":
 
         # # Example usuage:
         # # python3 sim.py --save_dir data/out/raw/rd/related17Jul --k 100 
-        sbm_random()
+        # sbm_random()
+        er_random()
 

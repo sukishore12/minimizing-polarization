@@ -158,6 +158,42 @@ def opt_max_common_ground(G1, s1, G2, s2):
 
     return (G2_new, nonedges.difference(set([new_edge])), new_edge)
 
+def opt_max_dis(G1, s1, G2, s2):
+
+    n = len(G1.nodes())
+    G1_new = G1.copy()  
+    d = G1.degree()
+
+    x = get_expressed(G1,s1)
+
+    nonedges = set(itertools.combinations(range(n),2)).difference(set(G1_new.edges()))
+    
+    obj_nonedges = [(x[i] - x[j])**2 for (i,j) in nonedges]  
+    new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
+    G1_new.add_edges_from([new_edge])
+
+    return (G1_new, nonedges.difference(set([new_edge])), new_edge)
+
+
+def opt_max_grad(G1, s1, G2, s2):
+
+    n = len(G1.nodes())
+    G1_new = G1.copy()  
+    d = G1.degree()
+    x = get_expressed(G1,s1)
+    x_tilde = x - x.mean()
+
+    nonedges = set(itertools.combinations(range(n),2)).difference(set(G1_new.edges()))
+    I_n = np.identity(n)
+    grad_pt = 2*np.outer(x_tilde, x_tilde) @ np.linalg.inv(I_n+ nx.laplacian_matrix(G1).todense())
+
+    obj_nonedges = [get_grad(grad_pt, i, j) for (i,j) in nonedges]
+
+    new_edge = list(nonedges)[obj_nonedges.index(max(obj_nonedges))]
+    G1_new.add_edges_from([new_edge])
+
+    return (G1_new, nonedges.difference(set([new_edge])), new_edge)
+
 ########################### Network Optimization ###########################
 def test_heuristics_two_graphs(funs, G1, G2, s1, s2, 
                                k = None, 
